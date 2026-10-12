@@ -1,0 +1,18 @@
+node_modules
+dist
+.firebase
+.firebaserc
+.DS_Store
+__pycache__/
+
+# yoxi 競賽原始資料與逐筆資料（含乘客編號與精確座標，不可外流）
+data-pipeline/data/raw/*
+!data-pipeline/data/raw/.gitkeep
+data-pipeline/data/extracted/*
+!data-pipeline/data/extracted/.gitkeep
+data-pipeline/data/raw_df.pkl
+data-pipeline/data/processed/*.parquet
+
+# 測試產物
+scripts/output/
+scripts/fixtures/

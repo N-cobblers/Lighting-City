@@ -1,0 +1,35 @@
+<section id="appendix" data-transition="fade" style="background:#F5F0E6;color:#14213D;font-family:'Noto Sans TC', sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:32px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;color:#8A5400">7. 補充資料｜參考資料</p>
+<h2 style="font-size:60px;font-weight:900;line-height:1.15;color:#14213D">資料來源與試算假設</h2>
+</div>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFDF8;border:1px solid #E3D9C6;border-radius:20px;padding:24px 28px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#14213D">資料來源</h3>
+<ul style="font-size:24px;line-height:1.45;color:#4A5568">
+<li>交通部《113 年民眾日常使用運具狀況調查》（2025/06）</li>
+<li>Z.com Engagement Lab，台灣叫車 App 使用洞察（2025/01）</li>
+<li>yoxi：TVBS、三立（2026/07）；數位時代（2024/01、2025/09）；App Store（2026/10）</li>
+<li>競品：KingAutos（2026/10）、旺得富（2025/10）、風傳媒（2025/12）、工商時報（2026/06）</li>
+<li>和泰集團會員數：工商時報（2026/01）</li>
+<li>計程車數：公視（2026/06，引交通部 2026/05 統計）</li>
+<li>雙北降雨日數：今周刊（2022/01）</li>
+<li>Lyft Price Lock：Lyft 2024 年第三季財報電話會議</li>
+<li>競賽規則：ht-hackathon.tw 與官方初賽提案模板（2026/10）</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFDF8;border:1px solid #E3D9C6;border-radius:20px;padding:24px 28px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#14213D">試算假設</h3>
+<ul style="font-size:24px;line-height:1.45;color:#4A5568">
+<li>每位月活每月活躍 15 天；每個活躍日 Firestore 讀 60 次、寫 6 次；Cloud Run 每月 40 次呼叫</li>
+<li>每日任務每人預先生成 1 次（輸入 2,000、輸出 300 tokens，Batch）；對話每人每月 10 則（1,500／150 tokens）</li>
+<li>單價（2026/10/10）：Gemini 3.1 Flash-Lite 每百萬 tokens，Batch US$0.125／0.75，即時 0.25／1.50；Firestore 每 10 萬次讀 US$0.03、寫 US$0.09；Cloud Run 每百萬次 US$0.40</li>
+<li>BigQuery ML 每週重訓，約 US$25／月（100 萬月活約 US$220）</li>
+<li>TAM：9.2 萬輛 × 每車每日趟次 × 營業天數；SAM：其中 App 叫車的比例（研究推估）</li>
+<li>平均車資 NT$300、派遣費 10%、每位玩家每月多搭 0.5 趟；1 美元＝31 新台幣</li>
+</ul>
+</div>
+</div>
+<p style="position:absolute;right:128px;bottom:64px;width:160px;text-align:right;font-size:24px;color:#5B6472">附錄 5</p>
+<aside>附錄列出簡報中所有數字的來源，以及成本試算和市場規模的假設，方便評審查核。</aside>
+</section>

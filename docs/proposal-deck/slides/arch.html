@@ -1,0 +1,65 @@
+<section id="arch" data-transition="fade" style="background:#F5F0E6;color:#14213D;font-family:'Noto Sans TC', sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:32px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;color:#8A5400">4. AI 應用方法｜技術架構與選用原因</p>
+<h2 style="font-size:60px;font-weight:900;line-height:1.15;color:#14213D">全走 Google 生態系，五週做出決賽原型</h2>
+</div>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;border:1px solid #E3D9C6;border-radius:20px;overflow:hidden;background:#FFFDF8">
+<div style="width:220px;display:flex;flex-direction:column;justify-content:center;gap:2px;background:#14213D;padding:16px 20px">
+<p style="font-size:26px;font-weight:700;color:#FFC94A">手機端</p>
+<p style="font-size:24px;color:#C9D3E6">Flutter App</p>
+</div>
+<div style="flex:1;display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;padding:14px">
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">Maps SDK＋H3</p><p style="font-size:24px;color:#4A5568">點燈地圖</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">ML Kit</p><p style="font-size:24px;color:#4A5568">手機上辨識車牌</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">ARCore／ARKit</p><p style="font-size:24px;color:#4A5568">AR 小精靈</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">FCM</p><p style="font-size:24px;color:#4A5568">情境推播</p></div>
+</div>
+</div>
+<div style="display:flex;border:1px solid #E3D9C6;border-radius:20px;overflow:hidden;background:#FFFDF8">
+<div style="width:220px;display:flex;flex-direction:column;justify-content:center;gap:2px;background:#14213D;padding:16px 20px">
+<p style="font-size:26px;font-weight:700;color:#FFC94A">服務層</p>
+<p style="font-size:24px;color:#C9D3E6">Firebase</p>
+</div>
+<div style="flex:1;display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;padding:14px">
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">Authentication</p><p style="font-size:24px;color:#4A5568">沿用 yoxi 會員登入</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">Firestore</p><p style="font-size:24px;color:#4A5568">點燈格、任務、好友排行</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">Cloud Functions</p><p style="font-size:24px;color:#4A5568">任務派發、拍車驗證</p></div>
+</div>
+</div>
+<div style="display:flex;border:1px solid #E3D9C6;border-radius:20px;overflow:hidden;background:#FFFDF8">
+<div style="width:220px;display:flex;flex-direction:column;justify-content:center;gap:2px;background:#14213D;padding:16px 20px">
+<p style="font-size:26px;font-weight:700;color:#FFC94A">AI 層</p>
+<p style="font-size:24px;color:#C9D3E6">Google Cloud</p>
+</div>
+<div style="flex:1;display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;padding:14px">
+<div style="display:flex;flex-direction:column;gap:2px;background:#FFE7A3;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">Vertex AI Gemini</p><p style="font-size:24px;color:#4A5568">生成情境任務、小精靈對話</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#FFE7A3;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">BigQuery ML</p><p style="font-size:24px;color:#4A5568">需求預測、推估空車時段（ARIMA_PLUS）</p></div>
+</div>
+</div>
+<div style="display:flex;border:1px solid #E3D9C6;border-radius:20px;overflow:hidden;background:#FFFDF8">
+<div style="width:220px;display:flex;flex-direction:column;justify-content:center;gap:2px;background:#14213D;padding:16px 20px">
+<p style="font-size:26px;font-weight:700;color:#FFC94A">資料層</p>
+<p style="font-size:24px;color:#C9D3E6">BigQuery</p>
+</div>
+<div style="flex:1;display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;padding:14px">
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">yoxi 資料</p><p style="font-size:24px;color:#4A5568">去識別化叫車資料</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">車隊即時位置</p><p style="font-size:24px;color:#4A5568">只供拍車驗證</p></div>
+<div style="display:flex;flex-direction:column;gap:2px;background:#F2E6CC;border-radius:12px;padding:10px 12px"><p style="font-size:24px;font-weight:700;color:#14213D">氣象署 API</p><p style="font-size:24px;color:#4A5568">降雨預報</p></div>
+</div>
+</div>
+</div>
+<div style="width:460px;display:flex;flex-direction:column;gap:10px;background:#14213D;border-radius:24px;padding:26px 28px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#FFC94A">為什麼選這些</h3>
+<p style="font-size:24px;line-height:1.45;color:#EEF2FA"><b>Flutter</b>：一套程式碼跑 iOS 與 Android，ML Kit、ARCore 都有現成套件</p>
+<p style="font-size:24px;line-height:1.45;color:#EEF2FA"><b>Firebase</b>：登入、即時資料、推播一次到位，原型開發最快</p>
+<p style="font-size:24px;line-height:1.45;color:#EEF2FA"><b>Gemini Flash-Lite</b>：中文生成品質足夠，Batch 半價，每位月活成本不到 1 元</p>
+<p style="font-size:24px;line-height:1.45;color:#EEF2FA"><b>BigQuery ML</b>：用 SQL 就能訓練時間序列，直接吃 yoxi 叫車資料</p>
+<p style="font-size:24px;line-height:1.45;color:#EEF2FA"><b>Google Cloud</b>：本屆合作夥伴，試辦期可申請運算資源</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1500px;font-size:24px;color:#5B6472">拍車驗證流程與安全、隱私設計見附錄 2</p>
+<p style="position:absolute;right:128px;bottom:64px;width:80px;text-align:right;font-family:'Fredoka', sans-serif;font-size:24px;color:#5B6472">09</p>
+<aside>技術架構分四層。手機端用 Flutter，一套程式碼支援 iOS 和 Android：Google Maps SDK 加上 H3 六角格畫出點燈地圖，ML Kit 在手機上辨識車牌，ARCore 和 ARKit 做 AR 小精靈，FCM 發情境推播。服務層用 Firebase 處理登入、資料和雲端函式。AI 層用 Vertex AI 上的 Gemini 生成情境任務和小精靈對話，用 BigQuery ML 預測需求、推估空車時段。資料層是 yoxi 的去識別化資料、只供驗證用的車隊即時位置，以及氣象署降雨預報。右邊是拍車驗證流程：手機上辨識、雜湊比對車隊名單、比對車輛即時位置、通過才發放，每車每人每天一次。</aside>
+</section>

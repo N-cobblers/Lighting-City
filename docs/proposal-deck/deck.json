@@ -1,0 +1,23 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-10-09T17:00:00Z"},
+  "lists": "css",
+  "title": "yoxi 點燈城 提案簡報",
+  "cover": "cover",
+  "order": ["cover", "summary", "overview", "pain", "users", "solution", "screens", "data", "engine", "arch", "cost", "compete", "highlights", "biz", "market", "validate", "proto", "verify", "team", "mapping", "appendix"],
+  "sections": {
+    "s0": {"description": "封面與提案摘要（摘要頁不計入 15 頁）", "start": "cover"},
+    "s1": {"description": "1. 提案概述", "start": "overview"},
+    "s2": {"description": "2. 目標對象與痛點分析", "start": "pain"},
+    "s3": {"description": "3. 解決方案設計", "start": "solution"},
+    "s4": {"description": "4. AI 應用方法", "start": "engine"},
+    "s5": {"description": "5. 獨特優勢與差異化", "start": "compete"},
+    "s6": {"description": "6. 預期效益與落地評估", "start": "biz"},
+    "s7": {"description": "7. 補充資料（附錄，不計入 15 頁）", "start": "proto"}
+  },
+  "faces": {
+    "noto-sans-tc": {"family": "Noto Sans TC", "href": "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap"},
+    "fredoka": {"family": "Fredoka", "href": "https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap"}
+  },
+  "designSystems": []
+}

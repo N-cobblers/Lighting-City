@@ -1,0 +1,41 @@
+<section id="engine" data-transition="fade" style="background:#0E1830;color:#EEF2FA;font-family:'Noto Sans TC', sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;color:#FFC94A">4. AI 應用方法｜AI 核心</p>
+<h2 style="font-size:60px;font-weight:900;line-height:1.15;color:#EEF2FA">需求預測導流：乘客拿到優惠，司機多接到單</h2>
+</div>
+<div style="display:flex;align-items:center;gap:20px">
+<div style="width:300px;display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;line-height:1.4;color:#EEF2FA;background:#16264A;border:1px solid #2B3E6B;padding:10px 16px;border-radius:14px">yoxi 叫車時段與頻率</p>
+<p style="font-size:24px;line-height:1.4;color:#EEF2FA;background:#16264A;border:1px solid #2B3E6B;padding:10px 16px;border-radius:14px">熱門上下車點與 POI</p>
+<p style="font-size:24px;line-height:1.4;color:#EEF2FA;background:#16264A;border:1px solid #2B3E6B;padding:10px 16px;border-radius:14px">氣象署降雨預報</p>
+<p style="font-size:24px;line-height:1.4;color:#EEF2FA;background:#16264A;border:1px solid #2B3E6B;padding:10px 16px;border-radius:14px">個人常用地點與時段</p>
+</div>
+<x-shape kind="arrow-right" style="width:56px;height:32px;background:#FFC94A"></x-shape>
+<div style="width:300px;display:flex;flex-direction:column;gap:10px;background:#16264A;border:2px solid #2B3E6B;border-radius:20px;padding:24px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#FFC94A">BigQuery ML 需求預測</h3>
+<p style="font-size:24px;line-height:1.5;color:#B8C4DA">預測每個六角格、每個時段的叫車需求，找出司機容易空車的需求低谷</p>
+</div>
+<x-shape kind="arrow-right" style="width:56px;height:32px;background:#FFC94A"></x-shape>
+<div style="width:300px;display:flex;flex-direction:column;gap:10px;background:#16264A;border:2px solid #2B3E6B;border-radius:20px;padding:24px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#FFC94A">Gemini 生成情境任務</h3>
+<p style="font-size:24px;line-height:1.5;color:#B8C4DA">依個人常用地點與時段，把任務排進空車多的時段與地點</p>
+</div>
+<x-shape kind="arrow-right" style="width:56px;height:32px;background:#FFC94A"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;flex-direction:column;gap:8px;background:#16264A;border:2px solid #FFC94A;border-radius:20px;padding:22px 24px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#FFC94A">乘客</h3>
+<p style="font-size:24px;line-height:1.5;color:#EEF2FA">收到限時乘車金與點燈加成，搭車點亮整條路線</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;background:#16264A;border:2px solid #7CB7FF;border-radius:20px;padding:22px 24px">
+<h3 style="font-size:28px;font-weight:700;line-height:1.3;color:#7CB7FF">司機</h3>
+<p style="font-size:24px;line-height:1.5;color:#EEF2FA">空車時段多接單；自願加入「可被收集」者優先派單，另有被收集獎金</p>
+</div>
+</div>
+</div>
+<div style="display:flex;gap:16px;align-items:start;background:#FFC94A;border-radius:20px;padding:20px 28px">
+<p style="font-size:26px;font-weight:900;color:#14213D;white-space:nowrap">情境示意</p>
+<p style="flex:1;font-size:26px;line-height:1.5;color:#14213D">週二 14:00 信義區預測為需求低谷、空車偏多 → 對常在附近的玩家發任務：「下午搭 yoxi 去松菸，點亮沿途 8 格，乘車金限 14–16 點使用」</p>
+</div>
+<p style="position:absolute;right:128px;bottom:64px;width:80px;text-align:right;font-family:'Fredoka', sans-serif;font-size:24px;color:#9AA8C2">08</p>
+<aside>這是我們最核心的 AI。BigQuery ML 用 yoxi 的叫車時段資料、熱門上下車點和降雨預報，預測每個六角格、每個時段的叫車需求，推估空車多的時段。Gemini 再根據每個人的常用地點和時段，把任務排進空車多的時段和地點。乘客拿到限時乘車金和點燈加成；司機在原本沒單的時段多接到單，自願加入可被收集的司機還有優先派單和小額獎金。這讓遊戲同時服務乘客和司機兩端。畫面下方是一個示意情境。</aside>
+</section>

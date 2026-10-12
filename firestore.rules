@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 好友排行：rooms/{roomId}/players/{uid}
+    // 只有登入（匿名也算）的人能讀；每個人只能寫自己的那一筆，而且只能寫這幾個欄位。
+    match /rooms/{roomId}/players/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'sum', 'diff', 'plateMasked', 'palette', 'updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 20
+        && request.resource.data.sum is int && request.resource.data.sum >= 0 && request.resource.data.sum <= 36;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

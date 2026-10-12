@@ -1,0 +1,34 @@
+<section id="cost" data-transition="fade" style="background:#F5F0E6;color:#14213D;font-family:'Noto Sans TC', sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;color:#8A5400">4. AI 應用方法｜運算資源與成本試算</p>
+<h2 style="font-size:60px;font-weight:900;line-height:1.15;color:#14213D">每位月活每月的雲端成本不到 NT$1</h2>
+</div>
+<table style="font-size:24px;color:#14213D;background:#FFFDF8;border-radius:16px">
+<tr style="background:#14213D"><th style="width:40%;color:#EEF2FA;padding:10px 18px">每月成本（美元）</th><th style="width:20%;text-align:right;color:#EEF2FA">1 萬月活</th><th style="width:20%;text-align:right;color:#EEF2FA">10 萬月活</th><th style="width:20%;text-align:right;color:#EEF2FA">100 萬月活</th></tr>
+<tr><td>Gemini 每日情境任務（Batch，3.1 Flash-Lite）</td><td style="text-align:right">143</td><td style="text-align:right">1,425</td><td style="text-align:right">14,250</td></tr>
+<tr><td>Gemini 小精靈對話（3.1 Flash-Lite）</td><td style="text-align:right">60</td><td style="text-align:right">600</td><td style="text-align:right">6,000</td></tr>
+<tr><td>Firestore 讀寫與儲存</td><td style="text-align:right">3</td><td style="text-align:right">34</td><td style="text-align:right">351</td></tr>
+<tr><td>Cloud Run（API、拍車驗證）</td><td style="text-align:right">0（免費額度內）</td><td style="text-align:right">16</td><td style="text-align:right">212</td></tr>
+<tr><td>BigQuery（資料倉儲、每週重訓預測）</td><td style="text-align:right">25</td><td style="text-align:right">25</td><td style="text-align:right">220</td></tr>
+<tr><td>地圖、車牌辨識、AR、推播、氣象資料</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr>
+<tr style="background:#FFE7A3"><td style="font-weight:700">每月合計</td><td style="text-align:right;font-weight:700">230 ≈ NT$7,100</td><td style="text-align:right;font-weight:700">2,100 ≈ NT$6.5 萬</td><td style="text-align:right;font-weight:700">21,033 ≈ NT$65 萬</td></tr>
+<tr style="background:#FFE7A3"><td style="font-weight:700">每位月活每月</td><td style="text-align:right;font-weight:700">NT$0.71</td><td style="text-align:right;font-weight:700">NT$0.65</td><td style="text-align:right;font-weight:700">NT$0.65</td></tr>
+</table>
+<div style="display:flex;gap:24px">
+<div style="flex:1;display:flex;flex-direction:column;gap:6px;background:#FFFDF8;border:1px solid #E3D9C6;border-radius:20px;padding:20px 24px">
+<h3 style="font-size:26px;font-weight:700;line-height:1.3;color:#8A5400">還能再省一半</h3>
+<p style="font-size:24px;line-height:1.5;color:#4A5568">同區同時段的玩家共用任務骨架，只個人化細節，總成本約降 50%</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:6px;background:#FFFDF8;border:1px solid #E3D9C6;border-radius:20px;padding:20px 24px">
+<h3 style="font-size:26px;font-weight:700;line-height:1.3;color:#8A5400">獎勵預算另計</h3>
+<p style="font-size:24px;line-height:1.5;color:#4A5568">乘車金限空車時段使用、每人每日上限、集團夥伴共同出獎</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:6px;background:#FFFDF8;border:1px solid #E3D9C6;border-radius:20px;padding:20px 24px">
+<h3 style="font-size:26px;font-weight:700;line-height:1.3;color:#8A5400">試辦期資源</h3>
+<p style="font-size:24px;line-height:1.5;color:#4A5568">可申請本屆合作夥伴 Google Cloud 的運算資源支應</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1500px;font-size:24px;color:#5B6472">單價：Google Cloud 與 Gemini API 官方定價（2026/10/10 查詢）；1 美元＝31 新台幣；各項四捨五入；用量假設見附錄 5</p>
+<p style="position:absolute;right:128px;bottom:64px;width:80px;text-align:right;font-family:'Fredoka', sans-serif;font-size:24px;color:#5B6472">10</p>
+<aside>成本試算分三種規模。最大的成本是 Gemini：每天幫每位玩家預先生成一次情境任務，用 Batch API 打五折；小精靈對話用即時呼叫。Firestore、Cloud Run、BigQuery 的費用相對很小；地圖用的是行動版 Maps SDK，車牌辨識和 AR 都在手機上做，不另外收費。換算下來，每位月活每月的雲端成本大約 0.65 到 0.71 元新台幣。如果同區同時段的玩家共用任務骨架，總成本還能再省一半。獎勵預算另外編列，並用空車時段限定和每日上限控制。</aside>
+</section>
