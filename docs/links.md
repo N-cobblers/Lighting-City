@@ -12,6 +12,7 @@
 
 ## 本機文件
 
+- `docs/data-analysis-report.md`：yoxi 叫車資料分析報告（完整版，圖在 `docs/data-analysis/`）
 - `docs/decisions-50.md`：產品與提案的 50 題討論結果
 - `docs/implementation-decisions.md`：原型實作的 30 題決定
 - `docs/research-report.md`、`docs/research-notes/`：yoxi 與高頻互動痛點研究

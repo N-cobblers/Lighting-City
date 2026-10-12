@@ -6,7 +6,7 @@
 
 ```
 data-pipeline/
-  scripts/00–06_*.py        依序執行
+  scripts/00–07_*.py        依序執行（報告見 ../docs/data-analysis-report.md）
   geo/towns.geojson         內政部鄉鎮市區界（判定行政區用）
   data/raw/                 放原始 7z（不進版控）
   data/extracted/yoxi/      解壓後的 CSV（不進版控）
@@ -32,6 +32,7 @@ python scripts/03_analysis.py          # 指標 → metrics.json
 python scripts/04_forecast.py          # 預測與驗證 → forecast_results.json、how_profiles.json
 python scripts/05_export.py            # BigQuery 表、demo 指數、上車點
 python scripts/06_compact.py           # （選用）精簡版逐筆資料 yoxi_trips_clean.parquet
+python scripts/07_report_charts.py     # 資料分析報告的圖 → ../docs/data-analysis/*.png
 cp data/processed/demo/demand_xinyi_songshan.json ../src/data/demand.json
 ```
 
