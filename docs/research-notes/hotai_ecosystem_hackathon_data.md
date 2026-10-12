@@ -142,7 +142,7 @@ Hotai describes itself as moving "from a pure car company to a professional mobi
 ## Q4. The 2026 和泰 AI 黑客松: official details (organizers, timeline, prizes, eligibility, judging, finals, data, IP)
 
 ### Takeaway
-The official page (ht-hackathon.tw, run by 獎金獵人/bhuntr) was reachable through WebFetch and gives the full timeline, prize table, eligibility rules and scoring weights. Preliminary scoring is topic relevance 30%, creativity 25%, feasibility 25% and AI integration 20%. Finals scoring is feasibility 25%, AI 20%, business value 20%, prototype completeness 20% and presentation 15%. Fifteen finalists will be announced 10/28, attend a mandatory 11/07 workshop and demo a working prototype on 11/21. The full yoxi challenge text and the data dictionary sit in a "企業挑戰題目" section or download area that could not be retrieved.
+The official page (ht-hackathon.tw, run by 獎金獵人/bhuntr) was reachable through WebFetch and gives the full timeline, prize table, eligibility rules and scoring weights. Preliminary scoring is topic relevance 30%, creativity 25%, feasibility 25% and AI integration 20%. Finals scoring is feasibility 25%, AI 20%, business value 20%, prototype completeness 20% and presentation 15%. Fifteen finalists will be announced 10/28, attend a mandatory 11/07 workshop and demo a working prototype on 11/21. The team later supplied the full yoxi challenge description and requested proposal contents (recorded in `CLAUDE.md`), but that wording has not been independently checked against the organizer's official copy; the data dictionary and data-use terms remain unverified.
 
 ### Cited Findings
 **Official sources and reachability**
@@ -166,6 +166,12 @@ The official page (ht-hackathon.tw, run by 獎金獵人/bhuntr) was reachable th
 - 11/18 (Wed) 23:59: final proposal upload, a PDF of up to 30 pages excluding appendix, not bound to the preliminary chapter structure
 - 11/21 (Sat): finals presentation, live demo and awards. Venue not stated.
 
+**Team-provided yoxi challenge brief** — supplied on 2026-10-12 and recorded in `CLAUDE.md`; wording not independently verified against the official page:
+- **Problem:** Ride-hailing apps are mainly opened when users already have a specific travel need, limiting app frequency and engagement. yoxi wants to shift from a tool passively waiting for ride requests to a proactive service platform that is a partner in city mobility and life.
+- **Goal:** Use AI to design a yoxi-contextual, compelling daily interactive service that gives people a reason to open yoxi every day even when they are not taking a ride.
+- **Four objectives:** (1) relate to transportation, mobility, or urban life; (2) express yoxi's distinctive value; (3) sustain long-term motivation rather than short-lived novelty; (4) balance utility and fun, with personalization from user data or behavior preferred where possible.
+- **Four proposal contents:** (1) scenario and data-use plan, including target users and how data informs the service; (2) commercial conversion potential into actual ride demand or partnerships; (3) implementation architecture, technologies, compute resources, and cost estimates; (4) outcome validation, such as conversion, retention, and brand value.
+
 **Seven challenges (official titles)** — [Official/bhuntr page](https://ht-hackathon.tw/tw/y5sf0shclq6c3yn1db)
 1. TOYOTA: 「智能轉型：AI助攻油轉電」／TOYOTA EV新生活
 2. TOYOTA: 「運用AI再造 TOYOTA 下一代顧客售後服務體驗」
@@ -174,7 +180,7 @@ The official page (ht-hackathon.tw, run by 獎金獵人/bhuntr) was reachable th
 5. iRent: 「運用 AI 打造 iRent 智能車況管家：優化租還車體驗與營運效率」
 6. **yoxi: 「不搭車，也打開 yoxi —— 打造高頻互動的AI出行夥伴」**
 7. 去趣 eSIM: 「打造去趣 eSIM 全旅程智能銷售與服務體驗」
-- Full descriptions are on the official site under "企業挑戰題目". The public landing page shows only titles — [bhuntr page](https://bhuntr.com/tw/competitions/y5sf0shclq6c3yn1db)
+- The official site has an "企業挑戰題目" section; the team's supplied brief above should still be checked against the official wording and downloaded materials — [bhuntr page](https://bhuntr.com/tw/competitions/y5sf0shclq6c3yn1db)
 
 **Prizes** — [Official site](https://ht-hackathon.tw/tw/)
 - Champion NT$300,000 + trophy. Runner-up NT$250,000 + trophy. Third NT$200,000 + trophy. Certificates for each member and mentor.
@@ -212,7 +218,7 @@ The official page (ht-hackathon.tw, run by 獎金獵人/bhuntr) was reachable th
 - A team can submit to other challenges too (up to 7). Reusing the same data pipeline for an iRent or 去趣 entry is allowed.
 
 ### Gaps
-- **The full yoxi challenge text, data dictionary, data-access method (download vs. API vs. sandbox), and any data-use or NDA terms could not be retrieved.** They appear to be in the "企業挑戰題目" section or 報名資料下載區. The team should read these directly.
+- **Still to verify:** the full official wording against the team-provided brief, plus the data dictionary, data-access method (download vs. API vs. sandbox), and any data-use or NDA terms. Check the "企業挑戰題目" section and 報名資料下載區 directly.
 - 2026 judges not announced publicly. Finals venue and whether finals are public or streamed are not stated. The early-bird benefit is not described.
 - Full IP clauses (e.g., whether non-finalists keep all rights, scope of the finalist license) are not shown publicly.
 - The amount of Google Cloud credits or environment specifics was not found.
