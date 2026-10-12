@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雙北熱門路段</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781; --line: rgba(11,11,11,.10);
+    --accent: #2a78d6; --night: #0E1830; --lamp: #FFC94A;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--surface); color: var(--ink);
+    font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .panel { position: absolute; top: 16px; left: 16px; right: 16px; max-width: 380px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 2px 12px rgba(0,0,0,.08); z-index: 2; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: var(--ink2); margin: 0 0 10px; line-height: 1.5; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .tabs button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink); cursor: pointer; }
+  .tabs button[aria-pressed="true"] { background: var(--night); color: #fff; border-color: var(--night); }
+  .legend { font-size: 12px; color: var(--ink2); }
+  .ramp { height: 8px; border-radius: 4px; margin: 4px 0 2px;
+    background: linear-gradient(90deg, #b7d3f6, #6da7ec, #2a78d6, #1c5cab, #0d366b); }
+  .ramp-labels { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .note { font-size: 11px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--lamp); color: var(--night); margin-left: 6px; vertical-align: middle; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.6; box-shadow: 0 2px 8px rgba(0,0,0,.12); z-index: 3; display: none; min-width: 180px; }
+  .tip b { font-variant-numeric: tabular-nums; }
+  .tip .row { display: flex; justify-content: space-between; gap: 12px; }
+  .tip .hl { color: var(--ink); font-weight: 600; }
+  .tip .dim { color: var(--ink2); }
+  @media (max-width: 480px) { .panel { padding: 12px; } h1 { font-size: 15px; } }
+</style>
+</head>
+<body>
+<div id="map" role="region" aria-label="雙北熱門路段地圖"></div>
+<div class="panel">
+  <h1>雙北 yoxi 熱門路段<span class="tag">黑客松原型</span></h1>
+  <p class="sub" id="sub"></p>
+  <div class="tabs" role="group" aria-label="時段" id="tabs"></div>
+  <div class="legend">
+    <span id="unit"></span>
+    <div class="ramp"></div>
+    <div class="ramp-labels"><span>少</span><span id="vmax"></span></div>
+  </div>
+  <p class="note">路線是把起訖點歸到 H3 第 9 級六角格中心後，用 OSRM 推估的最快路線，不是實際行駛軌跡。每個時段少於 10 趟的路段不顯示。資料：yoxi 競賽資料 2026/2/1–4/30（彙總）。</p>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const DATA = /*DATA*/null;
+const fmt = (x, d = 0) => x.toLocaleString('zh-TW', { maximumFractionDigits: d, minimumFractionDigits: d });
+const P = DATA.periods, H = DATA.hours;
+const MODES = [{ key: 'total', label: '全部', col: 4, unit: '三個月經過趟數', div: 1 }]
+  .concat(P.map((p, i) => ({ key: p, label: p, col: 5 + i, unit: '平均每小時經過趟數', div: H[p] })));
+let mode = MODES[0];
+document.getElementById('sub').textContent = '平日尖峰：' + DATA.defs['平日尖峰'] + '；平日低谷：' + DATA.defs['平日低谷'] + '；週末與連假：全天';
+
+function q999(a) { const s = a.filter(x => x > 0).sort((x, y) => x - y); return s[Math.floor(s.length * 0.999)] || 1; }
+function build(m) {
+  const vals = DATA.rows.map(r => r[m.col] / m.div);
+  const vmax = q999(vals);
+  const feats = [];
+  DATA.rows.forEach((r, i) => {
+    if (r[m.col] <= 0) return;
+    feats.push({ type: 'Feature', id: i, geometry: { type: 'LineString', coordinates: [[r[0], r[1]], [r[2], r[3]]] },
+      properties: { t: Math.sqrt(Math.min(vals[i] / vmax, 1)), i } });
+  });
+  feats.sort((a, b) => a.properties.t - b.properties.t);
+  return { fc: { type: 'FeatureCollection', features: feats }, vmax };
+}
+
+const map = new maplibregl.Map({
+  container: 'map', style: 'https://tiles.openfreemap.org/styles/positron',
+  center: [121.53, 25.05], zoom: 11.3, attributionControl: false,
+});
+map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '路線推估：OSRM・© OpenStreetMap contributors' }));
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+function render() {
+  const { fc, vmax } = build(mode);
+  map.getSource('flow').setData(fc);
+  document.getElementById('unit').textContent = mode.unit;
+  document.getElementById('vmax').textContent = fmt(vmax, mode.div === 1 ? 0 : 1) + ' 以上';
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.key === mode.key)));
+}
+
+map.on('load', () => {
+  map.addSource('flow', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  const firstLabel = (map.getStyle().layers.find(l => l.type === 'symbol') || {}).id;  // 流量線放在地名下面
+  map.addLayer({ id: 'flow', type: 'line', source: 'flow', layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': ['interpolate', ['linear'], ['get', 't'], 0, '#b7d3f6', 0.25, '#6da7ec', 0.5, '#2a78d6', 0.75, '#1c5cab', 1, '#0d366b'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, ['+', 0.3, ['*', 3, ['get', 't']]], 15, ['+', 1, ['*', 9, ['get', 't']]]],
+    } }, firstLabel);
+  map.addLayer({ id: 'hit', type: 'line', source: 'flow', paint: { 'line-width': 12, 'line-opacity': 0 } });
+  MODES.forEach(m => {
+    const b = document.createElement('button'); b.textContent = m.label; b.dataset.key = m.key; b.type = 'button';
+    b.onclick = () => { mode = m; render(); }; document.getElementById('tabs').appendChild(b);
+  });
+  render();
+  const tip = document.getElementById('tip');
+  const show = (e) => {
+    map.getCanvas().style.cursor = 'pointer';
+    const r = DATA.rows[e.features[0].properties.i];
+    let h = '<div class="row ' + (mode.key === 'total' ? 'hl' : 'dim') + '"><span>三個月合計</span><b>' + fmt(r[4]) + ' 趟</b></div>';
+    P.forEach((p, k) => {
+      const v = r[5 + k];
+      h += '<div class="row ' + (mode.key === p ? 'hl' : 'dim') + '"><span>' + p + '</span><b>' + (v > 0 ? fmt(v / H[p], 1) + ' 趟／時' : '少於 10 趟') + '</b></div>';
+    });
+    tip.innerHTML = h; tip.style.display = 'block';
+    const x = Math.min(e.point.x + 14, window.innerWidth - tip.offsetWidth - 8), y = Math.min(e.point.y + 14, window.innerHeight - tip.offsetHeight - 8);
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  };
+  map.on('mousemove', 'hit', show);
+  map.on('click', 'hit', show);  // 手機用點的
+  map.on('mouseleave', 'hit', () => { map.getCanvas().style.cursor = ''; tip.style.display = 'none'; });
+});
+</script>
+</body>
+</html>

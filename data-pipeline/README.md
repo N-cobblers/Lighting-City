@@ -6,7 +6,7 @@
 
 ```
 data-pipeline/
-  scripts/00–07_*.py        依序執行（報告見 ../docs/data-analysis-report.md）
+  scripts/00–10_*.py        依序執行（報告見 ../docs/data-analysis-report.md；08–10 需要 Docker，見下方「最短路線」）
   geo/towns.geojson         內政部鄉鎮市區界（判定行政區用）
   data/raw/                 放原始 7z（不進版控）
   data/extracted/yoxi/      解壓後的 CSV（不進版控）
@@ -17,6 +17,8 @@ data-pipeline/
     yoxi_pickup_spots.csv   全台 yoxi 指定上車點與座標中位數
     demo/demand_xinyi_songshan.json   App 用的彙總指數（複製到 src/data/demand.json）
     bigquery/               BigQuery 用逐時表與 SQL
+    routes/                 雙北路段流量（每時段 ≥ 10 趟）、繞路比與壅塞係數
+  data/osrm/                OpenStreetMap 路網與 OSRM 處理檔（不進版控）
 ```
 
 ## 執行
@@ -62,6 +64,27 @@ cp data/processed/demo/demand_xinyi_songshan.json ../src/data/demand.json
 ## 預測方法
 
 逐時需求（每小時上車數）的隔日預測：取近 4 週非假日的同星期同小時平均，再用最近 7 天實際量與型態的比值調整水位（限制在 0.8–1.25）。用 2/23–4/16 建模、逐日預測 4/17–4/30，WAPE 比「上週同時段」基準低 12–21%。正式版在 BigQuery ML 用 ARIMA_PLUS（`bigquery/sql/`）。
+
+## 最短路線與熱門路段（本機 OSRM）
+
+資料只有起終點，路線用 OpenStreetMap 路網推估。**起終點座標只能送到本機的 OSRM**，不可以用 Google 路線 API 或 OSRM 公開伺服器。需要 Docker。
+
+```bash
+pip install "osmium>=4.0"
+curl -L -o data/osrm/taiwan-latest.osm.pbf https://download.geofabrik.de/asia/taiwan-latest.osm.pbf
+python scripts/08_osm_crop.py          # 裁成雙北、只留道路 → data/osrm/metro.osm.pbf（約 2 分鐘）
+# Git Bash 要先 export MSYS_NO_PATHCONV=1；路徑換成自己的 data/osrm 絕對路徑
+IMG=ghcr.io/project-osrm/osrm-backend:v5.27.1; V="$PWD/data/osrm:/data"
+docker run --rm -v "$V" $IMG osrm-extract -p /opt/car.lua /data/metro.osm.pbf
+docker run --rm -v "$V" $IMG osrm-partition /data/metro.osrm
+docker run --rm -v "$V" $IMG osrm-customize /data/metro.osrm
+docker run -d --name osrm-metro -p 127.0.0.1:5000:5000 -v "$V" $IMG osrm-routed --algorithm mld /data/metro.osrm
+python scripts/09_routes.py            # 約 27 萬組起訖算路線（約 10 分鐘）→ data/processed/routes/
+python scripts/10_route_charts.py      # → ../docs/data-analysis/09–11_*.png、../docs/route-flow.html
+docker rm -f osrm-metro
+```
+
+做法：雙北內的有效行程（起訖都在雙北、不同格子），起終點歸到 H3 第 9 級格子中心，算「時間最短」路線，路段不分方向依趟數疊加。時段：平日尖峰（7–9、17–19 點）、平日低谷（10–16 點）、週末與連假。每個時段少於 10 趟的路段記為 0、不畫。另外算繞路比（實際行駛距離 ÷ 最快路線距離）與壅塞係數（實際行駛時間 ÷ OSRM 不塞車時間），只看最快路線 ≥ 1 公里的行程。
 
 ## BigQuery（免費沙盒，不用綁卡）
 

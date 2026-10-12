@@ -12,6 +12,8 @@ data-pipeline/data/extracted/*
 !data-pipeline/data/extracted/.gitkeep
 data-pipeline/data/raw_df.pkl
 data-pipeline/data/processed/*.parquet
+# OSRM 路網（OpenStreetMap 下載與處理檔，體積大，可重新產生）
+data-pipeline/data/osrm/
 
 # 測試產物
 scripts/output/
