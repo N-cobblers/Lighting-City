@@ -37,6 +37,7 @@ function taskRoute(t: Task): Route {
 
 export function MapView() {
   const s = useStore()
+  const [gridOpacity, setGridOpacity] = useState(35)
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const carRef = useRef<maplibregl.Marker | null>(null)
@@ -45,7 +46,9 @@ export function MapView() {
   const [genBusy, setGenBusy] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(true)
   const litRef = useRef(s.lit)
+  const gridOpacityRef = useRef(gridOpacity)
   litRef.current = s.lit
+  gridOpacityRef.current = gridOpacity
   const sheetRef = useRef<HTMLElement>(null)
   const sheetPad = () => {
     const h = box.current?.clientHeight || 700
@@ -56,17 +59,18 @@ export function MapView() {
 
   const addLayers = useCallback((map: MlMap) => {
     if (map.getSource('area')) return
+    const opacity = gridOpacityRef.current / 100
     map.addSource('area', { type: 'geojson', data: cellsFeatureCollection(AREA_CELLS) as any })
     map.addSource('lit', { type: 'geojson', data: cellsFeatureCollection(Object.keys(litRef.current), (c) => ({ level: litRef.current[c] })) as any })
     map.addSource('trail', { type: 'geojson', data: lineFeature([]) as any })
-    map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#2B3E6B', 'line-opacity': 0.55, 'line-width': 0.8 } })
+    map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#2B3E6B', 'line-opacity': 0.55 * opacity, 'line-width': 0.8 } })
     map.addLayer({
       id: 'lit-fill',
       type: 'fill',
       source: 'lit',
-      paint: { 'fill-color': '#FFC94A', 'fill-opacity': ['interpolate', ['linear'], ['get', 'level'], 1, 0.16, 2, 0.34, 3, 0.58] },
+      paint: { 'fill-color': '#FFC94A', 'fill-opacity': ['interpolate', ['linear'], ['get', 'level'], 1, 0.16 * opacity, 2, 0.34 * opacity, 3, 0.58 * opacity] },
     })
-    map.addLayer({ id: 'lit-line', type: 'line', source: 'lit', paint: { 'line-color': '#FFD873', 'line-opacity': ['interpolate', ['linear'], ['get', 'level'], 1, 0.25, 3, 0.8], 'line-width': 1 } })
+    map.addLayer({ id: 'lit-line', type: 'line', source: 'lit', paint: { 'line-color': '#FFD873', 'line-opacity': ['interpolate', ['linear'], ['get', 'level'], 1, 0.25 * opacity, 3, 0.8 * opacity], 'line-width': 1 } })
     map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FFC94A', 'line-width': 12, 'line-blur': 8, 'line-opacity': 0.65 } })
     map.addLayer({ id: 'trail-core', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FFE9A8', 'line-width': 3 } })
   }, [])
@@ -118,12 +122,21 @@ export function MapView() {
     }
   }, [addLayers])
 
-  // keep lit layer in sync
+  // Keep the lit layer in sync with the footprint.
   useEffect(() => {
     const map = mapRef.current
     const src = map?.getSource('lit') as maplibregl.GeoJSONSource | undefined
     if (src) src.setData(cellsFeatureCollection(Object.keys(s.lit), (c) => ({ level: s.lit[c] })) as any)
   }, [s.lit])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const opacity = gridOpacity / 100
+    if (!map?.getLayer('area-line') || !map.getLayer('lit-fill') || !map.getLayer('lit-line')) return
+    map.setPaintProperty('area-line', 'line-opacity', 0.55 * opacity)
+    map.setPaintProperty('lit-fill', 'fill-opacity', ['interpolate', ['linear'], ['get', 'level'], 1, 0.16 * opacity, 2, 0.34 * opacity, 3, 0.58 * opacity])
+    map.setPaintProperty('lit-line', 'line-opacity', ['interpolate', ['linear'], ['get', 'level'], 1, 0.25 * opacity, 3, 0.8 * opacity])
+  }, [gridOpacity])
 
   // tasks
   const regenerate = useCallback(async () => {
@@ -238,6 +251,11 @@ export function MapView() {
         <div className="chip chip-lamp">點亮 {s.litPct}%</div>
         <div className="chip">{s.weather.eveningPop >= 60 ? `傍晚降雨 ${s.weather.eveningPop}%` : `傍晚降雨 ${s.weather.eveningPop}%`}{s.weather.source === 'scenario' ? '・情境' : '・氣象署'}</div>
         <div className="chip">幸運數字 {s.lucky}</div>
+        <label className="grid-opacity" htmlFor="grid-opacity">
+          <span>六角格深淺</span>
+          <input id="grid-opacity" type="range" min="0" max="100" step="5" value={gridOpacity} onChange={(event) => setGridOpacity(Number(event.target.value))} />
+          <output htmlFor="grid-opacity">{gridOpacity}%</output>
+        </label>
       </div>
       {mapNote && <div className="map-note">{mapNote}</div>}
       {riding && (

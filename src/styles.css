@@ -81,6 +81,9 @@ textarea.input { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .map-view { position: absolute; inset: 0; }
 .map { position: absolute; inset: 0; background: var(--night-2); }
 .map-hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 2; pointer-events: none; }
+.grid-opacity { display: flex; align-items: center; gap: 8px; width: min(280px, 100%); margin-top: 1px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: rgba(10, 19, 38, 0.9); color: var(--cream); font-size: 11px; pointer-events: auto; }
+.grid-opacity input { flex: 1; min-width: 70px; height: 4px; accent-color: var(--lamp); cursor: pointer; }
+.grid-opacity output { min-width: 32px; color: var(--lamp); text-align: right; font-variant-numeric: tabular-nums; }
 .map-note { position: absolute; top: 48px; left: 10px; font-size: 11.5px; color: var(--muted); background: rgba(10, 19, 38, 0.8); padding: 3px 8px; border-radius: 8px; z-index: 2; }
 .ride-banner { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 3; background: var(--ink); border: 1px solid var(--lamp); color: var(--lamp-2); border-radius: 999px; padding: 7px 14px; font-size: 13px; white-space: nowrap; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 18px rgba(255, 201, 74, 0.35); }
 .ride-banner .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lamp); animation: pulse 1s infinite; }

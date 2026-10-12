@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { cellToChildren, getResolution } from 'h3-js'
 import { loadSettings, readJSON, saveSettings, writeJSON, type Settings } from './settings'
 import type { Collected, Source, Task, Weather } from './types'
-import { AREA_SET, cellAt, poiById, routeById, routeCells } from './geo'
+import { AREA_SET, RES, cellAt, poiById, routeById, routeCells } from './geo'
 import { PERSONA, slotOf } from '../data/demo'
 import { luckyNumber } from './lucky'
 import { fetchCwa, rainScenario } from './weather'
@@ -10,14 +11,34 @@ import demand from '../data/demand.json'
 export type Tab = 'map' | 'sprite' | 'scan' | 'friends' | 'ops'
 export type Toast = { id: number; text: string; tone?: 'lamp' | 'plain' }
 
-const LIT_KEY = 'yoxi-lighting-city:lit:v5'
-const VISIT_KEY = 'yoxi-lighting-city:visits:v1'
-const LEGACY_LIT_KEY = 'yoxi-lighting-city:lit:v4'
+const LIT_KEY = 'yoxi-lighting-city:lit:v6'
+const VISIT_KEY = 'yoxi-lighting-city:visits:v2'
+const LEGACY_LIT_KEYS = ['yoxi-lighting-city:lit:v5', 'yoxi-lighting-city:lit:v4']
+const LEGACY_VISIT_KEYS = ['yoxi-lighting-city:visits:v1']
 const COL_KEY = 'yoxi-lighting-city:collected:v1'
 const DAY_MS = 24 * 60 * 60 * 1000
 const GLOW_FADE_DAYS = 7
 
 type VisitHistory = Record<string, number[]>
+
+function expandToCurrentResolution<T>(cells: Record<string, T>): Record<string, T> {
+  const expanded: Record<string, T> = {}
+  for (const [cell, value] of Object.entries(cells)) {
+    const children = getResolution(cell) < RES ? cellToChildren(cell, RES) : [cell]
+    for (const child of children) expanded[child] = value
+  }
+  return expanded
+}
+
+function loadBaseLit(): Record<string, number> {
+  const current = readJSON<Record<string, number> | null>(LIT_KEY, null)
+  if (current && typeof current === 'object') return current
+  for (const key of LEGACY_LIT_KEYS) {
+    const legacy = readJSON<Record<string, number> | null>(key, null)
+    if (legacy && typeof legacy === 'object') return expandToCurrentResolution(legacy)
+  }
+  return initialBaseLit()
+}
 
 function initialBaseLit(): Record<string, number> {
   const lit: Record<string, number> = {}
@@ -42,23 +63,31 @@ function initialVisitHistory(now = Date.now()): VisitHistory {
 function loadVisitHistory(): VisitHistory {
   const stored = readJSON<VisitHistory | null>(VISIT_KEY, null)
   if (stored && typeof stored === 'object') {
-    return Object.fromEntries(
+    return expandToCurrentResolution(Object.fromEntries(
       Object.entries(stored)
         .filter(([, times]) => Array.isArray(times))
         .map(([cell, times]) => [cell, times.filter((time) => Number.isFinite(time)).sort((a, b) => a - b).slice(-3)]),
-    )
+    ))
+  }
+
+  for (const key of LEGACY_VISIT_KEYS) {
+    const legacyVisits = readJSON<VisitHistory | null>(key, null)
+    if (legacyVisits && typeof legacyVisits === 'object') {
+      return expandToCurrentResolution(legacyVisits)
+    }
   }
 
   // Preserve an existing prototype map when upgrading from the previous storage format.
-  const legacy = readJSON<Record<string, number> | null>(LEGACY_LIT_KEY, null)
+  const legacy = LEGACY_LIT_KEYS.map((key) => readJSON<Record<string, number> | null>(key, null)).find((value) => value && typeof value === 'object')
   if (legacy && typeof legacy === 'object') {
     const now = Date.now()
-    return Object.fromEntries(
+    const visits = Object.fromEntries(
       Object.entries(legacy).map(([cell, level]) => [
         cell,
         Array.from({ length: Math.max(1, Math.min(3, Math.round(level) || 1)) }, (_, i) => now - (2 - i) * DAY_MS),
       ]),
     )
+    return expandToCurrentResolution(visits)
   }
   return initialVisitHistory()
 }
@@ -113,7 +142,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [simClock, setSimClock] = useState<{ h: number; m: number } | null>(null)
   const [tick, setTick] = useState(0)
   const [weather, setWeather] = useState<Weather>(() => rainScenario(new Date()))
-  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => readJSON(LIT_KEY, initialBaseLit()))
+  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => loadBaseLit())
   const [visits, setVisits] = useState<VisitHistory>(() => loadVisitHistory())
   const [tasks, setTaskList] = useState<Task[]>([])
   const [greeting, setGreeting] = useState('')

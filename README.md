@@ -27,7 +27,7 @@
 
 | 功能 | 技術 | 說明 |
 |---|---|---|
-| 點燈地圖 | MapLibre GL、OpenFreeMap 暗色底圖、h3-js | H3 第 9 級六角格（約 0.1 km²），搭車沿途格子即時點亮；底圖載不到時自動換成離線夜色底圖 |
+| 點燈地圖 | MapLibre GL、OpenFreeMap 暗色底圖、h3-js | H3 第 10 級六角格（平均約 0.015 km²），搭車沿途格子即時點亮；底圖載不到時自動換成離線夜色底圖 |
 | 今日 AI 任務、小精靈對話、拍車台詞、營運派任務 | Firebase AI Logic（Gemini Developer API）、`gemini-3.1-flash-lite` | 結構化 JSON 輸出；連不上時自動改用示範資料並標示 |
 | 拍車辨識 | PaddleOCR PP-OCRv4 辨識模型、ONNX Runtime Web | 在手機上辨識，照片不上傳；車牌以雜湊比對示範車隊名單 |
 | AR 小精靈 | three.js、model-viewer | 相機畫面上 3D 小精靈跳出；「AR 召喚」用 iPhone Quick Look／Android Scene Viewer 放到地上 |

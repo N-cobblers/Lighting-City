@@ -1,6 +1,7 @@
-import { cellToBoundary, gridDisk, latLngToCell, polygonToCells, cellToLatLng } from 'h3-js'
+import { cellToBoundary, cellToChildren, gridDisk, getResolution, latLngToCell, polygonToCells, cellToLatLng } from 'h3-js'
 
-export const RES = 9
+// The personal lighting map uses finer cells than the R9 cells in the analysis pipeline.
+export const RES = 10
 export type LngLat = [number, number]
 
 /** 信義區＋松山區 play area (lat/lng box). */
