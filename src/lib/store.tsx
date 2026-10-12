@@ -10,22 +10,66 @@ import demand from '../data/demand.json'
 export type Tab = 'map' | 'sprite' | 'scan' | 'friends' | 'ops'
 export type Toast = { id: number; text: string; tone?: 'lamp' | 'plain' }
 
-const LIT_KEY = 'yoxi-lighting-city:lit:v4'
+const LIT_KEY = 'yoxi-lighting-city:lit:v5'
+const VISIT_KEY = 'yoxi-lighting-city:visits:v1'
+const LEGACY_LIT_KEY = 'yoxi-lighting-city:lit:v4'
 const COL_KEY = 'yoxi-lighting-city:collected:v1'
+const DAY_MS = 24 * 60 * 60 * 1000
+const GLOW_FADE_DAYS = 7
 
-function initialLit(): Record<string, number> {
+type VisitHistory = Record<string, number[]>
+
+function initialBaseLit(): Record<string, number> {
   const lit: Record<string, number> = {}
-  for (const h of PERSONA.history30d) {
-    for (const { cell } of routeCells(routeById(h.route).path)) lit[cell] = Math.min(3, (lit[cell] || 0) + 1)
-  }
   for (const id of PERSONA.walkedPois) {
     const p = poiById(id)
-    if (p) {
-      const c = cellAt(p.lng, p.lat)
-      lit[c] = Math.max(lit[c] || 0, 2)
-    }
+    if (p) lit[cellAt(p.lng, p.lat)] = 2
   }
   return lit
+}
+
+function initialVisitHistory(now = Date.now()): VisitHistory {
+  const visits: VisitHistory = {}
+  for (const h of PERSONA.history30d) {
+    const visitedAt = now - (30 - h.day) * DAY_MS
+    for (const { cell } of routeCells(routeById(h.route).path)) {
+      visits[cell] = [...(visits[cell] || []), visitedAt].sort((a, b) => a - b).slice(-3)
+    }
+  }
+  return visits
+}
+
+function loadVisitHistory(): VisitHistory {
+  const stored = readJSON<VisitHistory | null>(VISIT_KEY, null)
+  if (stored && typeof stored === 'object') {
+    return Object.fromEntries(
+      Object.entries(stored)
+        .filter(([, times]) => Array.isArray(times))
+        .map(([cell, times]) => [cell, times.filter((time) => Number.isFinite(time)).sort((a, b) => a - b).slice(-3)]),
+    )
+  }
+
+  // Preserve an existing prototype map when upgrading from the previous storage format.
+  const legacy = readJSON<Record<string, number> | null>(LEGACY_LIT_KEY, null)
+  if (legacy && typeof legacy === 'object') {
+    const now = Date.now()
+    return Object.fromEntries(
+      Object.entries(legacy).map(([cell, level]) => [
+        cell,
+        Array.from({ length: Math.max(1, Math.min(3, Math.round(level) || 1)) }, (_, i) => now - (2 - i) * DAY_MS),
+      ]),
+    )
+  }
+  return initialVisitHistory()
+}
+
+function glowLevel(times: number[], now: number) {
+  if (!times.length) return 0
+  const recentCount = times.filter((time) => now - time < 30 * DAY_MS).length
+  const repeats = Math.max(1, Math.min(3, recentCount))
+  const lastVisit = Math.max(...times)
+  const fade = Math.floor(Math.max(0, now - lastVisit) / (GLOW_FADE_DAYS * DAY_MS))
+  return Math.max(1, repeats - fade)
 }
 
 export const LOW_WINDOWS = [
@@ -45,6 +89,7 @@ type Store = {
   lit: Record<string, number>
   litPct: number
   lightCells: (cells: string[], level?: number) => number
+  recordRideCells: (cells: string[]) => { newCells: number; renewedCells: number }
   resetLit: () => void
   tasks: Task[]
   greeting: string
@@ -68,7 +113,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [simClock, setSimClock] = useState<{ h: number; m: number } | null>(null)
   const [tick, setTick] = useState(0)
   const [weather, setWeather] = useState<Weather>(() => rainScenario(new Date()))
-  const [lit, setLit] = useState<Record<string, number>>(() => readJSON(LIT_KEY, initialLit()))
+  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => readJSON(LIT_KEY, initialBaseLit()))
+  const [visits, setVisits] = useState<VisitHistory>(() => loadVisitHistory())
   const [tasks, setTaskList] = useState<Task[]>([])
   const [greeting, setGreeting] = useState('')
   const [tasksSource, setTasksSource] = useState<Source | null>(null)
@@ -77,10 +123,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [pendingRide, setPendingRide] = useState<string | null>(null)
   const toastId = useRef(0)
-  const litRef = useRef(lit)
-  useEffect(() => {
-    litRef.current = lit
-  }, [lit])
+  const baseLitRef = useRef(baseLit)
+  const visitsRef = useRef(visits)
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 30000)
@@ -94,7 +138,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simClock, tick])
 
-  useEffect(() => writeJSON(LIT_KEY, lit), [lit])
+  const lit = useMemo(() => {
+    const levels = { ...baseLit }
+    for (const [cell, times] of Object.entries(visits)) levels[cell] = Math.max(levels[cell] || 0, glowLevel(times, now.getTime()))
+    return levels
+  }, [baseLit, visits, now])
+  const litRef = useRef(lit)
+  litRef.current = lit
+
+  useEffect(() => writeJSON(LIT_KEY, baseLit), [baseLit])
+  useEffect(() => writeJSON(VISIT_KEY, visits), [visits])
   useEffect(() => writeJSON(COL_KEY, collected), [collected])
 
   useEffect(() => {
@@ -131,13 +184,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const lightCells = useCallback((cells: string[], level = 3) => {
     const added = cells.filter((c) => (litRef.current[c] || 0) < level).length
-    setLit((prev) => {
+    setBaseLit((prev) => {
       const next = { ...prev }
       for (const c of cells) next[c] = Math.max(next[c] || 0, level)
-      litRef.current = next
+      baseLitRef.current = next
       return next
     })
     return added
+  }, [])
+
+  const recordRideCells = useCallback((cells: string[]) => {
+    const nowMs = Date.now()
+    const previous = visitsRef.current
+    const next = { ...previous }
+    let newCells = 0
+    let renewedCells = 0
+    for (const cell of cells) {
+      const times = previous[cell] || []
+      if (times.length === 0 && !baseLitRef.current[cell]) newCells++
+      else renewedCells++
+      next[cell] = [...times, nowMs].slice(-3)
+    }
+    visitsRef.current = next
+    setVisits(next)
+    return { newCells, renewedCells }
   }, [])
 
   const litPct = useMemo(() => {
@@ -158,8 +228,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     lit,
     litPct,
     lightCells,
+    recordRideCells,
     resetLit: () => {
-      setLit(initialLit())
+      const nextBase = initialBaseLit()
+      const nextVisits = initialVisitHistory()
+      baseLitRef.current = nextBase
+      visitsRef.current = nextVisits
+      setBaseLit(nextBase)
+      setVisits(nextVisits)
       setCollected([])
     },
     tasks,

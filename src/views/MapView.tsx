@@ -158,7 +158,8 @@ export function MapView() {
       const samples = samplePath(route.path, 8)
       const D = Math.min(9000, 3500 + cells.length * 300)
       const lit = new Set<string>()
-      let added = 0
+      let newCells = 0
+      let renewedCells = 0
       setRiding({ name: route.name, minutes: route.minutes, pct: 0 })
       await new Promise<void>((resolve) => {
         const t0 = performance.now()
@@ -171,7 +172,9 @@ export function MapView() {
           const fresh = cells.filter((c) => c.t <= t && !lit.has(c.cell)).map((c) => c.cell)
           if (fresh.length) {
             fresh.forEach((c) => lit.add(c))
-            added += s.lightCells(fresh, 3)
+            const result = s.recordRideCells(fresh)
+            newCells += result.newCells
+            renewedCells += result.renewedCells
           }
           setRiding({ name: route.name, minutes: route.minutes, pct: Math.round(t * 100) })
           if (t < 1) requestAnimationFrame(frame)
@@ -180,14 +183,17 @@ export function MapView() {
         requestAnimationFrame(frame)
       })
       const ring = [...new Set(cells.flatMap((c) => neighbours(c.cell)))].filter((c) => !lit.has(c))
-      added += s.lightCells(ring, 1)
+      s.lightCells(ring, 1)
       setRiding(null)
       if (task) s.completeTask(task.id)
-      s.toast(added > 0 ? `搭 yoxi 抵達！沿途點亮 ${added} 格` : '搭 yoxi 抵達！這條路已經全亮了', 'lamp')
+      const message = newCells > 0
+        ? `搭 yoxi 抵達！首次點亮 ${newCells} 格${renewedCells ? `，${renewedCells} 格熟悉的光也更新了` : ''}`
+        : `搭 yoxi 抵達！${renewedCells} 格熟悉的足跡重新亮起`
+      s.toast(message, 'lamp')
       setTimeout(() => carRef.current?.remove(), 2500)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [riding, s.lightCells],
+    [riding, s.lightCells, s.recordRideCells],
   )
 
   // rides requested from elsewhere (demo bar, chat)
@@ -255,6 +261,7 @@ export function MapView() {
         </div>
         {s.tasksSource === 'demo' && <div className="demo-tag">示範資料（Gemini 未連線）</div>}
         {s.tasksSource === 'live' && <div className="live-tag">Gemini 即時生成</div>}
+        <p className="muted tiny">重訪讓光暈更暖；久未經過會柔和淡去，足跡只保存在這支裝置。</p>
         <ul className="tasks">
           {(genBusy && !s.tasks.length ? [0, 1, 2] : s.tasks).map((t: any, i: number) =>
             typeof t === 'number' ? (
