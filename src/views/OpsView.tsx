@@ -142,7 +142,7 @@ export function OpsView() {
   return (
     <div className="ops-view scroll">
       <header className="ops-head">
-        <strong>營運視角：需求預測導流</strong>
+        <strong>需求預測導流</strong>
         <span className="muted small">資料：yoxi 競賽資料 2026/2–4 彙總指數（不含個別行程）</span>
       </header>
       <div className="seg">

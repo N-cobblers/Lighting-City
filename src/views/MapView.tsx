@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useStore, LOW_WINDOWS } from '../lib/store'
 import { AREA_CELLS, CENTER, POIS, cellAt, cellsFeatureCollection, interpolateAlong, lineFeature, neighbours, pathLengthKm, poiById, routeById, routeCells, samplePath, type LngLat, type Route } from '../lib/geo'
 import { generateTasks } from '../lib/ai'
 import { slotOf, SLOT_LABEL } from '../data/demo'
-import type { Task } from '../lib/types'
+import type { Task, TaskKind } from '../lib/types'
 import districts from '../data/districts.json'
 import { SpriteAvatar } from './SpriteAvatar'
 
@@ -20,6 +20,10 @@ const FALLBACK_STYLE: StyleSpecification = {
     { id: 'd-line', type: 'line', source: 'districts', paint: { 'line-color': '#2B3E6B', 'line-width': 1.2 } },
   ],
 }
+
+const KIND_LABEL: Record<TaskKind, string> = { walk: '步行', scan: '拍車', ride: '搭 yoxi' }
+// 不搭車的任務排前面，搭車（加倍）的排最後
+const KIND_ORDER: Record<TaskKind, number> = { walk: 0, scan: 1, ride: 2 }
 
 function taskRoute(t: Task): Route {
   if (t.poiId === 'home') return routeById('evening-home')
@@ -43,8 +47,14 @@ export function MapView() {
   const carRef = useRef<maplibregl.Marker | null>(null)
   const [mapNote, setMapNote] = useState('')
   const [riding, setRiding] = useState<{ name: string; minutes: number; pct: number } | null>(null)
+  const [waiting, setWaiting] = useState<number | null>(null)
   const [genBusy, setGenBusy] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(true)
+  const [sheetH, setSheetH] = useState(300)
+  const [pop, setPop] = useState<{ id: number; text: string } | null>(null)
+  const [idx, setIdx] = useState(0)
+  const rail = useRef<HTMLUListElement>(null)
+  const popId = useRef(0)
   const litRef = useRef(s.lit)
   const gridOpacityRef = useRef(gridOpacity)
   litRef.current = s.lit
@@ -53,7 +63,7 @@ export function MapView() {
   const sheetPad = () => {
     const h = box.current?.clientHeight || 700
     const sh = sheetRef.current?.getBoundingClientRect().height || 300
-    return Math.min(h * 0.6, sheetOpen ? sh : 118)
+    return Math.min(h * 0.6, sh)
   }
   const slot = slotOf(s.now)
 
@@ -138,6 +148,31 @@ export function MapView() {
     map.setPaintProperty('lit-line', 'line-opacity', ['interpolate', ['linear'], ['get', 'level'], 1, 0.25 * opacity, 3, 0.8 * opacity])
   }, [gridOpacity])
 
+  // 小精靈跳出來的那句話，放在抽屜上緣
+  useEffect(() => {
+    const el = sheetRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setSheetH(el.getBoundingClientRect().height))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const showPop = useCallback((text: string, ms = 2800) => {
+    const id = ++popId.current
+    setPop({ id, text })
+    setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms)
+  }, [])
+
+  const glowAt = useCallback((at: LngLat) => {
+    const map = mapRef.current
+    if (!map) return
+    const el = document.createElement('div')
+    el.className = 'glow-ring'
+    el.innerHTML = '<span></span>'
+    const marker = new maplibregl.Marker({ element: el }).setLngLat(at).addTo(map)
+    setTimeout(() => marker.remove(), 1700)
+  }, [])
+
   // tasks
   const regenerate = useCallback(async () => {
     setGenBusy(true)
@@ -156,16 +191,90 @@ export function MapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot, s.weather.eveningPop])
 
+  // 任務輪播：一次一張卡，左右滑
+  const cards = useMemo(
+    () =>
+      s.tasks
+        .map((t, i) => ({ t, i }))
+        .sort((a, b) => KIND_ORDER[a.t.kind] - KIND_ORDER[b.t.kind] || a.i - b.i)
+        .map((x) => x.t),
+    [s.tasks],
+  )
+  const idsSig = cards.map((t) => t.id).join('|')
+  const doneSig = cards.map((t) => (t.done ? '1' : '0')).join('')
+
+  const goTo = useCallback(
+    (i: number, smooth = true) => {
+      const n = Math.max(0, Math.min(cards.length - 1, i))
+      setIdx(n)
+      const el = rail.current
+      if (el && el.clientWidth) el.scrollTo({ left: n * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' })
+    },
+    [cards.length],
+  )
+
+  // 抽屜展開或切回這個分頁時，回到原本那張卡
+  useLayoutEffect(() => {
+    const el = rail.current
+    if (el && el.clientWidth) el.scrollLeft = idx * el.clientWidth
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetOpen, s.tab])
+
+  const onRailScroll = () => {
+    const el = rail.current
+    if (!el || !el.clientWidth) return
+    const i = Math.round(el.scrollLeft / el.clientWidth)
+    if (i !== idx) setIdx(i)
+  }
+
+  // 任務重新生成時回到第一張；只是多加一張卡就不動
+  const prevIds = useRef(idsSig)
+  useEffect(() => {
+    const before = prevIds.current ? prevIds.current.split('|') : []
+    prevIds.current = idsSig
+    const now = idsSig ? idsSig.split('|') : []
+    if (!before.every((id) => now.includes(id))) goTo(0, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsSig])
+
+  // 完成一張卡：蓋章，0.8 秒後滑到下一張還沒完成的卡
+  const prevDone = useRef(doneSig)
+  useEffect(() => {
+    const before = prevDone.current
+    prevDone.current = doneSig
+    if (before.length !== doneSig.length) return
+    const just = cards.findIndex((t, i) => t.done && before[i] === '0')
+    if (just < 0) return
+    const after = cards.findIndex((t, i) => !t.done && i > just)
+    const target = after >= 0 ? after : cards.findIndex((t) => !t.done)
+    if (target < 0) return
+    const timer = setTimeout(() => goTo(target), 800)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doneSig])
+
+  // 小精靈「晚點走」加的卡：切回地圖時直接滑到那張
+  useEffect(() => {
+    if (!s.focusTask || s.tab !== 'map') return
+    const i = cards.findIndex((t) => t.id === s.focusTask)
+    if (i < 0) return
+    s.setFocusTask(null)
+    setSheetOpen(true)
+    setTimeout(() => goTo(i), 150)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.focusTask, s.tab, idsSig])
+
   const ride = useCallback(
-    async (route: Route, task?: Task) => {
+    async (route: Route, task?: Task, boost = 1) => {
       const map = mapRef.current
       if (!map || riding) return
       map.resize()
+      map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 })
       const cells = routeCells(route.path)
       setSheetOpen(false)
       const bounds = new maplibregl.LngLatBounds(route.path[0], route.path[0])
       route.path.forEach((p) => bounds.extend(p))
-      map.fitBounds(bounds, { padding: { top: 110, bottom: 150, left: 50, right: 50 }, duration: 900, maxZoom: 13.9 })
+      map.fitBounds(bounds, { padding: { top: 160, bottom: 150, left: 50, right: 50 }, duration: 900, maxZoom: 13.9 })
       await new Promise((r) => setTimeout(r, 950))
       carRef.current?.setLngLat(route.path[0]).addTo(map)
       const samples = samplePath(route.path, 8)
@@ -185,7 +294,7 @@ export function MapView() {
           const fresh = cells.filter((c) => c.t <= t && !lit.has(c.cell)).map((c) => c.cell)
           if (fresh.length) {
             fresh.forEach((c) => lit.add(c))
-            const result = s.recordRideCells(fresh)
+            const result = s.recordRideCells(fresh, boost)
             newCells += result.newCells
             renewedCells += result.renewedCells
           }
@@ -199,24 +308,44 @@ export function MapView() {
       s.lightCells(ring, 1)
       setRiding(null)
       if (task) s.completeTask(task.id)
-      const message = newCells > 0
-        ? `搭 yoxi 抵達！首次點亮 ${newCells} 格${renewedCells ? `，${renewedCells} 格熟悉的光也更新了` : ''}`
-        : `搭 yoxi 抵達！${renewedCells} 格熟悉的足跡重新亮起`
-      s.toast(message, 'lamp')
+      if (route.id === 'evening-home') s.markHomeRide()
+      glowAt(route.path[route.path.length - 1])
+      const head = boost > 1 ? '聰明出行，路線亮兩階！' : '搭 yoxi 抵達！'
+      showPop(
+        newCells > 0 ? `${head}首次點亮 ${newCells} 格${renewedCells ? `，${renewedCells} 格熟悉的光更亮了` : ''}` : `${head}${renewedCells} 格熟悉的足跡重新亮起`,
+        3600,
+      )
       setTimeout(() => carRef.current?.remove(), 2500)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [riding, s.lightCells, s.recordRideCells],
+    [riding, s.lightCells, s.recordRideCells, glowAt, showPop],
   )
 
-  // rides requested from elsewhere (demo bar, chat)
+  // 小精靈「現在走」：先等車，小精靈陪你，再開始搭車
+  const waitThenRide = useCallback(
+    async (route: Route, minutes: number, boost = 1) => {
+      if (riding || waiting !== null) return
+      setSheetOpen(false)
+      setWaiting(minutes)
+      mapRef.current?.resize()
+      mapRef.current?.flyTo({ center: route.path[0], zoom: 14.2, duration: 800 })
+      showPop('等車時看看今天點亮了哪裡～', 3400)
+      await new Promise((r) => setTimeout(r, 3600))
+      setWaiting(null)
+      ride(route, undefined, boost)
+    },
+    [riding, waiting, ride, showPop],
+  )
+
+  // rides requested from elsewhere (小精靈的三個選擇)
   useEffect(() => {
-    if (!s.pendingRide) return
-    const id = s.pendingRide
+    const r = s.pendingRide
+    if (!r) return
     s.requestRide(null)
-    const t = s.tasks.find((x) => x.id === id)
-    if (t) ride(taskRoute(t), t)
-    else ride(routeById(id) || routeById('evening-home'))
+    const t = r.taskId ? s.tasks.find((x) => x.id === r.taskId) : undefined
+    const route = t ? taskRoute(t) : routeById(r.routeId || 'evening-home') || routeById('evening-home')
+    if (r.waitMin) waitThenRide(route, r.waitMin, r.boost)
+    else ride(route, t, r.boost ?? (t ? 2 : 1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pendingRide])
 
@@ -226,96 +355,158 @@ export function MapView() {
     const c = cellAt(p.lng, p.lat)
     const n = s.lightCells([c], 3) + s.lightCells(neighbours(c).slice(0, Math.max(0, t.rewardCells - 1)), 2)
     s.completeTask(t.id)
-    mapRef.current?.flyTo({ center: [p.lng, p.lat], zoom: 13.8, duration: 900, padding: { top: 60, bottom: sheetPad(), left: 0, right: 0 } })
-    s.toast(n > 0 ? `完成「${t.title}」，點亮 ${n} 格！` : `完成「${t.title}」！這裡已經亮了`, 'lamp')
+    // 用 offset 讓開抽屜；flyTo 的 padding 會留在地圖上，之後搭車的 fitBounds 會被多扣一次
+    mapRef.current?.flyTo({ center: [p.lng, p.lat], zoom: 13.8, duration: 900, offset: [0, (60 - sheetPad()) / 2] })
+    setTimeout(() => glowAt([p.lng, p.lat]), 700)
+    showPop(n > 0 ? `點亮${p.name}了！` : `${p.name}本來就亮著，任務完成！`)
   }
 
-  const doGroup = async (t: Task) => {
-    const text = `一起搭 yoxi 回家？${t.detail}`
-    try {
-      if (navigator.share) await navigator.share({ title: 'yoxi 點燈城 揪團', text })
-      else await navigator.clipboard.writeText(text)
-      s.toast('已送出揪團邀請')
-    } catch {
-      s.toast('揪團邀請已準備好')
-    }
-    s.completeTask(t.id)
-  }
-
-  const kindLabel = { walk: '步行', ride: '搭 yoxi', group: '揪團' }
+  const doneN = cards.filter((t) => t.done).length
+  const nextTask = cards.find((t) => !t.done)
+  const summary = !cards.length
+    ? '今日任務準備中…'
+    : nextTask
+      ? `今日任務 ${doneN}/${cards.length}・下一個：${nextTask.title}`
+      : `今日任務 ${doneN}/${cards.length}・全部完成！`
+  const busy = !!riding || waiting !== null
 
   return (
     <div className="map-view">
       <div ref={box} className="map" aria-label="點燈地圖" />
       <div className="map-hud">
         <div className="chip chip-lamp">點亮 {s.litPct}%</div>
-        <div className="chip">{s.weather.eveningPop >= 60 ? `傍晚降雨 ${s.weather.eveningPop}%` : `傍晚降雨 ${s.weather.eveningPop}%`}{s.weather.source === 'scenario' ? '・情境' : '・氣象署'}</div>
+        <div className="chip">{`傍晚降雨 ${s.weather.eveningPop}%`}{s.weather.source === 'scenario' ? '・情境' : '・氣象署'}</div>
         <div className="chip">幸運數字 {s.lucky}</div>
         <label className="grid-opacity" htmlFor="grid-opacity">
           <span>六角格深淺</span>
           <input id="grid-opacity" type="range" min="0" max="100" step="5" value={gridOpacity} onChange={(event) => setGridOpacity(Number(event.target.value))} />
           <output htmlFor="grid-opacity">{gridOpacity}%</output>
         </label>
+        <div className="lit-legend" aria-label="亮度說明">
+          <span>
+            <i className="hex l1" />
+            初訪
+          </span>
+          <span>
+            <i className="hex l2" />
+            熟悉
+          </span>
+          <span>
+            <i className="hex l3" />
+            常去
+          </span>
+          <em>7 天沒經過淡一階，不會消失</em>
+        </div>
       </div>
       {mapNote && <div className="map-note">{mapNote}</div>}
+      {waiting !== null && (
+        <div className="ride-banner" role="status">
+          <span className="dot" /> 等車中・司機約 {waiting} 分鐘到
+        </div>
+      )}
       {riding && (
         <div className="ride-banner" role="status">
           <span className="dot" /> {riding.name}・約 {riding.minutes} 分鐘・點亮中 {riding.pct}%
         </div>
       )}
+      {pop && (
+        <div key={pop.id} className="sprite-pop" style={{ bottom: sheetH + 8 }} role="status">
+          <SpriteAvatar size={52} mood="wow" />
+          <span className="pop-bubble">{pop.text}</span>
+        </div>
+      )}
       <section ref={sheetRef} className={`sheet ${sheetOpen ? 'open' : ''}`} aria-label="今日 AI 任務">
-        <button className="sheet-handle" onClick={() => setSheetOpen((o) => !o)} aria-expanded={sheetOpen}>
+        <button className="sheet-handle" onClick={() => setSheetOpen((o) => !o)} aria-expanded={sheetOpen} aria-label={sheetOpen ? '收起任務' : '展開任務'}>
           <span />
         </button>
-        <div className="sheet-head">
-          <SpriteAvatar size={44} />
-          <div className="sheet-title">
-            <strong>今日 AI 任務・{SLOT_LABEL[slot]}</strong>
-            <span className="muted">{genBusy ? '小精靈正在依天氣、常用地點與空車低谷排任務…' : s.greeting || '　'}</span>
-          </div>
-          <button className="btn-ghost" onClick={regenerate} disabled={genBusy} aria-label="重新生成任務">
-            {genBusy ? '生成中' : '重新生成'}
+        {!sheetOpen ? (
+          <button className="sheet-summary" onClick={() => setSheetOpen(true)}>
+            <span>{summary}</span>
+            <span className="caret" aria-hidden="true">
+              ⌃
+            </span>
           </button>
-        </div>
-        {s.tasksSource === 'demo' && <div className="demo-tag">示範資料（Gemini 未連線）</div>}
-        {s.tasksSource === 'live' && <div className="live-tag">Gemini 即時生成</div>}
-        <p className="muted tiny">重訪讓光暈更暖；久未經過會柔和淡去，足跡只保存在這支裝置。</p>
-        <ul className="tasks">
-          {(genBusy && !s.tasks.length ? [0, 1, 2] : s.tasks).map((t: any, i: number) =>
-            typeof t === 'number' ? (
-              <li key={i} className="task skeleton" />
+        ) : (
+          <>
+            <div className="sheet-head">
+              <SpriteAvatar size={44} />
+              <div className="sheet-title">
+                <strong>今日 AI 任務・{SLOT_LABEL[slot]}</strong>
+                <span className="muted">{genBusy ? '小精靈正在依天氣、常用地點與空車低谷排任務…' : s.greeting || '　'}</span>
+              </div>
+              <button className="btn-ghost" onClick={regenerate} disabled={genBusy} aria-label="重新生成任務">
+                {genBusy ? '生成中' : '重新生成'}
+              </button>
+            </div>
+            <div className="sheet-tags">
+              {s.tasksSource === 'demo' && <span className="demo-tag">示範資料（Gemini 未連線）</span>}
+              {s.tasksSource === 'live' && <span className="live-tag">Gemini 即時生成</span>}
+              <span className="muted tiny">足跡只保存在這支裝置</span>
+            </div>
+            {genBusy && !cards.length ? (
+              <div className="task skeleton" />
             ) : (
-              <li key={t.id} className={`task ${t.done ? 'done' : ''}`}>
-                <div className="task-top">
-                  <span className={`kind kind-${t.kind}`}>{kindLabel[t.kind as keyof typeof kindLabel]}</span>
-                  <span className="window">{t.window}</span>
+              <>
+                <div className="rail-wrap">
+                  <ul ref={rail} className="task-rail" onScroll={onRailScroll} aria-label="今日任務卡">
+                    {cards.map((t, i) => (
+                      <li key={t.id} className="slide" aria-label={`第 ${i + 1} 張，共 ${cards.length} 張`}>
+                        <div className={`task ${t.done ? 'done' : ''}`}>
+                          <div className="task-top">
+                            <span className={`kind kind-${t.kind}`}>{KIND_LABEL[t.kind]}</span>
+                            <span className="window">{t.window}</span>
+                          </div>
+                          <strong className="task-title">{t.title}</strong>
+                          <p className="task-detail">{t.detail}</p>
+                          {t.reason && <p className="task-why">為什麼：{t.reason}</p>}
+                          <div className="task-foot">
+                            <span className="reward">
+                              點亮 {t.rewardCells} 格{t.kind === 'ride' ? '・搭了亮兩階' : ''}
+                              {t.rewardCredit > 0 ? `・乘車金 ${t.rewardCredit} 元` : ''}
+                            </span>
+                            {t.done ? (
+                              <span className="done-label">✓ 已完成</span>
+                            ) : t.kind === 'ride' ? (
+                              <button className="btn-lamp" disabled={busy} onClick={() => ride(taskRoute(t), t, 2)}>
+                                預約 yoxi
+                              </button>
+                            ) : t.kind === 'scan' ? (
+                              <button className="btn-lamp" onClick={() => s.setTab('scan')}>
+                                去拍車
+                              </button>
+                            ) : (
+                              <button className="btn-lamp" onClick={() => doWalk(t)}>
+                                我到了
+                              </button>
+                            )}
+                          </div>
+                          {t.done && (
+                            <span className="stamp" aria-hidden="true">
+                              已完成
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <strong className="task-title">{t.title}</strong>
-                <p className="task-detail">{t.detail}</p>
-                <div className="task-foot">
-                  <span className="reward">
-                    點亮 {t.rewardCells} 格{t.rewardCredit > 0 ? `・乘車金 ${t.rewardCredit} 元` : ''}
-                  </span>
-                  {t.done ? (
-                    <span className="done-label">已完成</span>
-                  ) : t.kind === 'ride' ? (
-                    <button className="btn-lamp" disabled={!!riding} onClick={() => ride(taskRoute(t), t)}>
-                      預約 yoxi
+                {cards.length > 1 && (
+                  <div className="dots">
+                    <button className="rail-arrow" onClick={() => goTo(idx - 1)} disabled={idx <= 0} aria-label="上一個任務">
+                      ‹
                     </button>
-                  ) : t.kind === 'group' ? (
-                    <button className="btn-lamp" onClick={() => doGroup(t)}>
-                      揪朋友
+                    {cards.map((t, i) => (
+                      <button key={t.id} className={`dot ${i === idx ? 'on' : ''} ${t.done ? 'done' : ''}`} onClick={() => goTo(i)} aria-label={`第 ${i + 1} 個任務：${t.title}`} aria-current={i === idx ? 'true' : undefined} />
+                    ))}
+                    <button className="rail-arrow" onClick={() => goTo(idx + 1)} disabled={idx >= cards.length - 1} aria-label="下一個任務">
+                      ›
                     </button>
-                  ) : (
-                    <button className="btn-lamp" onClick={() => doWalk(t)}>
-                      我到了
-                    </button>
-                  )}
-                </div>
-              </li>
-            ),
-          )}
-        </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
       </section>
     </div>
   )

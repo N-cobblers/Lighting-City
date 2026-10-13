@@ -77,7 +77,7 @@ npx firebase-tools deploy --only hosting,firestore:rules
 
 ```
 src/
-  App.tsx               外框：頂欄（時間＝一天劇本、AI 狀態燈、設定）、5 個分頁、toast
+  App.tsx               外框：頂欄（時間＝一天劇本、AI 狀態燈、營運入口、設定）、4 個分頁（城市、拍車、好友、小精靈）、營運全螢幕頁、toast
   lib/store.tsx         全域狀態（React context）：設定、模擬時間、天氣、點亮格子、任務、圖鑑、分頁
   lib/settings.ts       設定型別與 localStorage 讀寫（Firebase 設定、App Check、模型、房間、幸運數字覆寫…）
   lib/firebase.ts       Firebase 初始化（設定字串或 Hosting 的 /__/firebase/init.json）、App Check、匿名登入
@@ -88,11 +88,12 @@ src/
   lib/sprite3d.ts       three.js 車燈小精靈（相機畫面上跳出動畫）與 GLB 匯出
   lib/social.ts         Firestore 好友排行 rooms/{room}-{日期}/players/{uid}
   lib/weather.ts        氣象署 F-C0032-001 與「傍晚下雨」情境
-  views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap 暗色，失敗改離線底圖）、搭車點亮動畫、任務卡
+  lib/forecast.ts       小精靈的「你的下一趟」叫車預報（demand.json 信義區各星期幾逐時等車中位數）
+  views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap 暗色，失敗改離線底圖）、亮度圖例、搭車點亮動畫、任務卡輪播（不搭車的在前）
   views/ScanView.tsx    相機取景、辨識、小精靈、AR 召喚（model-viewer）
-  views/SpriteChat.tsx  小精靈對話
-  views/FriendsView.tsx 幸運數字、好友排行、揪團、圖鑑
-  views/OpsView.tsx     營運：需求熱度地圖、低谷時段、下一週預測、AI 派任務
+  views/SpriteChat.tsx  小精靈對話；第一句是叫車預報，附「準時預約／晚點走／現在走」
+  views/FriendsView.tsx 幸運數字、好友排行、圖鑑
+  views/OpsView.tsx     營運（頂欄「營運」進入的全螢幕頁，不放在乘客分頁）：需求熱度地圖、低谷時段、下一週預測、AI 派任務
   data/demand.json      由 data-pipeline 匯出的彙總指數（0–100），不含個別行程
   data/demo.ts          虛構示範玩家「小涵」、各時段示範任務與對話
   data/districts.json   台北市與部分新北市行政區界（離線底圖）
@@ -137,7 +138,7 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 
 - Firebase JS SDK v13 的 `Part` 要寫 `{ type: 'text', text }`。
 - `lib/ai.ts` 用 `Schema.object(...)` 做結構化輸出，回傳後一律再做欄位驗證與截斷。
-- 地圖的 bottom sheet 會蓋住下半部，`fitBounds`／`flyTo` 要帶 padding；搭車時先收起 sheet，`maxZoom` 13.9。
+- 地圖的 bottom sheet 會蓋住下半部，`fitBounds` 要帶 padding；`flyTo` 不要帶 padding（會留在地圖上，之後的 `fitBounds` 會被多扣一次而拉得很遠），改用 `offset`。搭車時先收起 sheet，`maxZoom` 13.9。
 - 拍車流程要先 `cropForOcr` 再停相機，否則會讀到黑畫面。
 - e2e 的假相機影片必須是直式（手機相機是直式；橫式影片在直式容器裡會被裁掉車牌）。
 - 視覺：深藍夜色 `#0E1830`、車燈暖黃 `#FFC94A`、奶油白 `#F5F0E6`、字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo。
