@@ -1,4 +1,4 @@
-"""端對端測試：用 Playwright 開手機尺寸的 Chromium，跑過地圖、搭車點亮、小精靈、拍車辨識、AR、好友、營運、劇本、設定。
+"""端對端測試：用 Playwright 開手機尺寸的 Chromium，跑過任務輪播、搭車點亮、小精靈預報（晚點走、現在走）、拍車辨識與拍車任務、AR、好友、營運、劇本、設定。
 
 先建置並啟動預覽：
   npm run build && npm run preview -- --port 4173
@@ -45,10 +45,26 @@ def main():
         page.on('pageerror', lambda e: failures.append(f'pageerror: {e}'[:500]))
         tab = lambda name: page.get_by_role('button', name=name, exact=True).click()
 
+        def script_step(i):
+            page.get_by_role('button', name='一天劇本').click()
+            page.wait_for_timeout(400)
+            page.get_by_role('menuitem').nth(i).click()
+            page.wait_for_timeout(1500)
+
         page.goto(a.url)
         page.wait_for_timeout(9000)
+        if page.locator('.tab-dot').count() == 0:
+            failures.append('小精靈分頁沒有亮出新預報的紅點')
+        script_step(1)  # 午休 12:30：步行、拍車、搭車各一張卡
         shot(page, '01_map')
         start = page.locator('.chip-lamp').first.inner_text()
+
+        page.get_by_role('button', name='我到了').first.click()
+        page.wait_for_timeout(600)
+        if page.locator('.task.done').count() < 1:
+            failures.append('按「我到了」之後卡片沒有蓋上已完成')
+        page.wait_for_timeout(1200)
+        shot(page, '01b_walk_done')
 
         page.get_by_role('button', name='預約 yoxi').first.click()
         page.wait_for_timeout(11000)
@@ -58,11 +74,26 @@ def main():
             failures.append(f'搭車後點亮比例沒有增加（{start} → {after}）')
 
         tab('小精靈')
-        page.get_by_role('button', name='今晚會下雨嗎？').click()
-        page.wait_for_timeout(3500)
+        page.wait_for_timeout(1200)
+        log = page.locator('.chat-log').inner_text()
+        if '叫車到上車' not in log:
+            failures.append('小精靈第一句沒有叫車預報：' + log.replace('\n', ' ')[:120])
+        page.get_by_role('button', name='晚點走').click()
+        page.wait_for_timeout(1200)
+        log = page.locator('.chat-log').inner_text()
+        if '19:00' not in log:
+            failures.append('按「晚點走」後小精靈沒有回覆 19:00：' + log.replace('\n', ' ')[-120:])
         shot(page, '03_chat')
+        if '今日任務' in log:
+            page.get_by_role('button', name='到地圖看這張卡').click()
+            page.wait_for_timeout(1500)
+            shot(page, '03b_later_card')
+            if page.get_by_text('19:00 從市府回家').count() == 0:
+                failures.append('按「晚點走」後任務輪播沒有多一張 19:00 的卡')
 
-        tab('拍車')
+        tab('城市')
+        page.wait_for_timeout(600)
+        page.get_by_role('button', name='去拍車').first.click()
         page.wait_for_timeout(3000)
         if has_cam:
             for _ in range(60):
@@ -79,6 +110,9 @@ def main():
             panel = page.locator('.scan-panel').inner_text()
             if 'TDX-39' not in panel:
                 failures.append('拍車沒有辨識出 TDX-3963：' + panel.replace('\n', ' ')[:200])
+            scan_card = page.locator('.task', has_text='找到一台 yoxi 車')
+            if scan_card.count() and 'done' not in (scan_card.first.get_attribute('class') or ''):
+                failures.append('拍到 yoxi 車後，拍車任務卡沒有自動完成')
             ar = page.get_by_role('button', name='AR 召喚')
             if ar.count():
                 ar.click()
@@ -89,18 +123,26 @@ def main():
         tab('好友')
         page.wait_for_timeout(2500)
         shot(page, '06_friends')
+        if '揪團' in page.locator('.friends-view').inner_text():
+            failures.append('好友頁還有揪團卡')
 
-        tab('營運')
+        page.get_by_role('button', name='營運', exact=True).click()
         page.wait_for_timeout(9000)
         page.get_by_role('button', name='設計空車時段任務').click()
         page.wait_for_timeout(3000)
         shot(page, '07_ops')
+        page.get_by_role('button', name='← 回乘客畫面').click()
+        page.wait_for_timeout(500)
 
-        page.get_by_role('button', name='一天劇本').click()
-        page.wait_for_timeout(400)
-        page.get_by_role('menuitem').nth(3).click()
-        page.wait_for_timeout(1500)
+        script_step(3)  # 傍晚 18:05：小精靈預報
         shot(page, '08_evening')
+        page.get_by_role('button', name='現在走').click()
+        page.wait_for_timeout(2600)
+        shot(page, '10_wait')
+        if '等車中' not in page.locator('.map-view').inner_text():
+            failures.append('按「現在走」後沒有出現等車畫面')
+        page.wait_for_timeout(12000)
+        shot(page, '11_home')
 
         page.get_by_role('button', name='設定').click()
         page.wait_for_timeout(500)

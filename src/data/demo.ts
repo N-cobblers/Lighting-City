@@ -53,33 +53,32 @@ export const FALLBACK_TASKS: Record<Slot, { greeting: string; tasks: Task[] }> =
   morning: {
     greeting: '早安小涵！今天傍晚會下雨，我先幫你排好三個任務。',
     tasks: [
-      { id: 'f-m1', title: '午休走去國父紀念館', detail: '走到國父紀念館打卡，點亮一格新的街區。', kind: 'walk', poiId: 'sunyatsen', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '常客午休多在公司附近活動，步行任務不需搭車也能打開 App。' },
-      { id: 'f-m2', title: '下午搭 yoxi 去松菸', detail: '14–16 點搭 yoxi 去松菸，沿途點亮街區，乘車金折 30 元。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點是需求低谷，等車時間短，空車相對多。' },
-      { id: 'f-m3', title: '下雨前預約回家', detail: '18 點前預約 yoxi 回民生社區，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚降雨機率高，平日 18 點是叫車尖峰，提早預約避開等不到車。' },
+      { id: 'f-m1', title: '午休走去國父紀念館', detail: '走到國父紀念館打卡，點亮一格新的街區。', kind: 'walk', poiId: 'sunyatsen', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '從公司走過去約 10 分鐘，午休剛好' },
+      { id: 'f-m2', title: '下午搭 yoxi 去松菸', detail: '14–16 點搭 yoxi 去松菸，沿途點亮街區，乘車金折 30 元。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點空車多，好叫車' },
+      { id: 'f-m3', title: '下雨前預約回家', detail: '18 點前預約 yoxi 回民生社區，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚可能下雨，18 點又是下班尖峰' },
     ],
   },
   lunch: {
     greeting: '午休時間！走一小段路就能點亮新的一格。',
     tasks: [
-      { id: 'f-l1', title: '散步到四四南村', detail: '午休走到四四南村，點亮 101 旁的老眷村。', kind: 'walk', poiId: 'sisinan', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '步行任務讓不搭車的日子也有打開的理由。' },
-      { id: 'f-l2', title: '下午搭 yoxi 去松菸', detail: '14–16 點搭 yoxi 去松菸，乘車金折 30 元。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點需求低、等車短，導流到空車時段。' },
-      { id: 'f-l3', title: '找到一台 yoxi 車', detail: '在人行道上遇見停妥的 yoxi 車，拍一下收集小精靈。', kind: 'walk', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區最熱門的 yoxi 上車點之一。' },
+      { id: 'f-l1', title: '散步到四四南村', detail: '午休走到四四南村，點亮 101 旁的老眷村。', kind: 'walk', poiId: 'sisinan', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '從公司走過去約 15 分鐘，午休剛好' },
+      { id: 'f-l2', title: '下午搭 yoxi 去松菸', detail: '14–16 點搭 yoxi 去松菸，乘車金折 30 元。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點空車多，好叫車' },
+      { id: 'f-l3', title: '找到一台 yoxi 車', detail: '在人行道上遇見停妥的 yoxi 車，拍一下收集小精靈。', kind: 'scan', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區熱門的 yoxi 上車點' },
     ],
   },
   afternoon: {
     greeting: '下午好！現在附近空車多，是出門的好時機。',
     tasks: [
-      { id: 'f-a1', title: '現在搭 yoxi 去松菸', detail: '16 點前出發，乘車金折 30 元，沿途點亮 6 格。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點是需求低谷，空車相對多。' },
-      { id: 'f-a2', title: '拍一台 yoxi 車', detail: '車牌加總最接近今日幸運數字的人獲勝。', kind: 'walk', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '遇見 yoxi 車是不用搭車也能玩的彩蛋。' },
-      { id: 'f-a3', title: '下雨前預約回家', detail: '18 點前預約 yoxi，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚降雨機率高，提早預約避開尖峰。' },
+      { id: 'f-a1', title: '現在搭 yoxi 去松菸', detail: '16 點前出發，乘車金折 30 元，沿途點亮 6 格。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '現在是信義區空車多的時段' },
+      { id: 'f-a2', title: '拍一台 yoxi 車', detail: '車牌加總最接近今日幸運數字的人獲勝。', kind: 'scan', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區熱門的 yoxi 上車點' },
+      { id: 'f-a3', title: '下雨前預約回家', detail: '18 點前預約 yoxi，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚可能下雨，提早預約不用在路邊等' },
     ],
   },
   evening: {
     greeting: '六點開始下雨了，先幫你預約回家吧！',
     tasks: [
-      { id: 'f-e1', title: '預約 yoxi 回家', detail: '18:10 從市府路上車點出發，沿途點亮 12 格。', kind: 'ride', poiId: 'home', window: '18:00–18:30', rewardCells: 12, rewardCredit: 0, reason: '下雨加上下班尖峰，提早預約能縮短等車時間。' },
-      { id: 'f-e2', title: '揪同事一起回民生社區', detail: '同方向的同事一起搭，車資平分，好友地圖一起點亮。', kind: 'group', poiId: 'home', window: '18:00–19:00', rewardCells: 4, rewardCredit: 0, reason: '揪團把兩趟需求併成一趟，尖峰時段更有效率。' },
-      { id: 'f-e3', title: '週末去饒河街夜市', detail: '週六 20 點後搭 yoxi 去饒河街，點亮松山東側。', kind: 'ride', poiId: 'raohe', window: '週六 20:00–21:00', rewardCells: 8, rewardCredit: 20, reason: '松山區平日與週末 20 點需求回落，等車短。' },
+      { id: 'f-e1', title: '預約 yoxi 回家', detail: '18:10 從市府路上車點出發，沿途點亮 12 格。', kind: 'ride', poiId: 'home', window: '18:00–18:30', rewardCells: 12, rewardCredit: 0, reason: '下雨又遇上下班尖峰，預約比較穩' },
+      { id: 'f-e3', title: '週末去饒河街夜市', detail: '週六 20 點後搭 yoxi 去饒河街，點亮松山東側。', kind: 'ride', poiId: 'raohe', window: '週六 20:00–21:00', rewardCells: 8, rewardCredit: 20, reason: '松山區晚上 8 點後需求回落，等車短' },
     ],
   },
 }

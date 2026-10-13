@@ -8,14 +8,18 @@ import { luckyNumber } from './lucky'
 import { fetchCwa, rainScenario } from './weather'
 import demand from '../data/demand.json'
 
-export type Tab = 'map' | 'sprite' | 'scan' | 'friends' | 'ops'
+export type Tab = 'map' | 'scan' | 'friends' | 'sprite'
 export type Toast = { id: number; text: string; tone?: 'lamp' | 'plain' }
+/** 從小精靈或任務卡發出的搭車請求。boost 2 = 預約或錯峰，路線亮兩階；waitMin 有值時先顯示等車。 */
+export type RideRequest = { routeId?: string; taskId?: string; boost?: number; waitMin?: number }
 
 const LIT_KEY = 'yoxi-lighting-city:lit:v6'
 const VISIT_KEY = 'yoxi-lighting-city:visits:v2'
 const LEGACY_LIT_KEYS = ['yoxi-lighting-city:lit:v5', 'yoxi-lighting-city:lit:v4']
 const LEGACY_VISIT_KEYS = ['yoxi-lighting-city:visits:v1']
 const COL_KEY = 'yoxi-lighting-city:collected:v1'
+const FORECAST_SEEN_KEY = 'yoxi-lighting-city:forecast-seen:v1'
+const HOME_RIDE_KEY = 'yoxi-lighting-city:home-ride:v1'
 const DAY_MS = 24 * 60 * 60 * 1000
 const GLOW_FADE_DAYS = 7
 
@@ -118,21 +122,29 @@ type Store = {
   lit: Record<string, number>
   litPct: number
   lightCells: (cells: string[], level?: number) => number
-  recordRideCells: (cells: string[]) => { newCells: number; renewedCells: number }
+  recordRideCells: (cells: string[], boost?: number) => { newCells: number; renewedCells: number }
   resetLit: () => void
   tasks: Task[]
   greeting: string
   tasksSource: Source | null
   setTasks: (t: Task[], greeting: string, source: Source) => void
+  addTask: (t: Task) => void
   completeTask: (id: string) => void
+  focusTask: string | null
+  setFocusTask: (id: string | null) => void
   collected: Collected[]
   addCollected: (c: Collected) => void
   tab: Tab
   setTab: (t: Tab) => void
   toasts: Toast[]
   toast: (text: string, tone?: Toast['tone']) => void
-  pendingRide: string | null
-  requestRide: (routeId: string | null) => void
+  pendingRide: RideRequest | null
+  requestRide: (r: RideRequest | null) => void
+  /** 今天已經搭車回家了（日期字串），預報就改成下一個平日。 */
+  homeRideDay: string
+  markHomeRide: () => void
+  forecastSeenKey: string
+  markForecastSeen: (key: string) => void
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -150,7 +162,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [collected, setCollected] = useState<Collected[]>(() => readJSON(COL_KEY, [] as Collected[]))
   const [tab, setTab] = useState<Tab>('map')
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [pendingRide, setPendingRide] = useState<string | null>(null)
+  const [pendingRide, setPendingRide] = useState<RideRequest | null>(null)
+  const [focusTask, setFocusTask] = useState<string | null>(null)
+  const [homeRideDay, setHomeRideDay] = useState(() => readJSON(HOME_RIDE_KEY, ''))
+  const [forecastSeenKey, setForecastSeenKey] = useState(() => readJSON(FORECAST_SEEN_KEY, ''))
   const toastId = useRef(0)
   const baseLitRef = useRef(baseLit)
   const visitsRef = useRef(visits)
@@ -178,6 +193,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => writeJSON(LIT_KEY, baseLit), [baseLit])
   useEffect(() => writeJSON(VISIT_KEY, visits), [visits])
   useEffect(() => writeJSON(COL_KEY, collected), [collected])
+  useEffect(() => writeJSON(FORECAST_SEEN_KEY, forecastSeenKey), [forecastSeenKey])
+  useEffect(() => writeJSON(HOME_RIDE_KEY, homeRideDay), [homeRideDay])
 
   useEffect(() => {
     let cancelled = false
@@ -222,7 +239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return added
   }, [])
 
-  const recordRideCells = useCallback((cells: string[]) => {
+  const recordRideCells = useCallback((cells: string[], boost = 1) => {
     const nowMs = Date.now()
     const previous = visitsRef.current
     const next = { ...previous }
@@ -232,7 +249,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const times = previous[cell] || []
       if (times.length === 0 && !baseLitRef.current[cell]) newCells++
       else renewedCells++
-      next[cell] = [...times, nowMs].slice(-3)
+      next[cell] = [...times, ...Array(Math.max(1, boost)).fill(nowMs)].slice(-3)
     }
     visitsRef.current = next
     setVisits(next)
@@ -275,7 +292,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setGreeting(g)
       setTasksSource(s)
     },
+    addTask: (t) => setTaskList((ts) => [...ts.filter((x) => x.id !== t.id), t]),
     completeTask: (id) => setTaskList((ts) => ts.map((t) => (t.id === id ? { ...t, done: true } : t))),
+    focusTask,
+    setFocusTask,
     collected,
     addCollected: (c) => setCollected((xs) => [c, ...xs].slice(0, 30)),
     tab,
@@ -284,6 +304,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toast,
     pendingRide,
     requestRide: setPendingRide,
+    homeRideDay,
+    markHomeRide: () => setHomeRideDay(new Date().toDateString()),
+    forecastSeenKey,
+    markForecastSeen: setForecastSeenKey,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

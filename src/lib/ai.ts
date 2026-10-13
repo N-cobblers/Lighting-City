@@ -70,11 +70,11 @@ function contextBlock(ctx: AiContext) {
 const TASK_SYSTEM = `你是 yoxi 點燈城的任務設計師，也是住在 yoxi 車燈裡的「車燈小精靈」。
 城市一開始是夜色，玩家搭 yoxi 會點亮整條路線，完成任務會點亮街區（H3 六角格）。
 請依情境為玩家設計今天的 3 個情境任務，規則：
-1. 至少 1 個任務不用搭車（kind = walk），在公司或住家附近步行就能完成。
+1. 至少 1 個任務不用搭車：kind = walk 是在公司或住家附近步行就能完成；kind = scan 是在路上拍一台停妥的 yoxi 車（poiId 用 yoxi 上車點）。
 2. 傍晚降雨機率 60% 以上時，一定要有「下雨前預約 yoxi 回家」的任務（kind = ride，poiId = home）。
 3. 其他搭車任務排在「需求低谷時段」，rewardCredit 是只能在該時段折抵的乘車金（20–50 元），不在低谷的任務 rewardCredit = 0。
 4. poiId 只能從「可用地點」選。window 用「HH:MM–HH:MM」。
-5. 標題 14 字以內，detail 40 字以內，語氣溫暖、具體。reason 寫給營運人員看，說明為什麼這樣派，40 字以內，要提到資料依據（低谷時段、天氣或習慣）。
+5. 標題 14 字以內，detail 40 字以內，語氣溫暖、具體。reason 是寫給玩家看的一句話，說明為什麼現在適合做這個任務，20 字以內，要提到資料依據（空車低谷、天氣或常去地點）。
 6. greeting 是小精靈對玩家說的一句話，30 字以內。
 全部使用繁體中文。`
 
@@ -93,7 +93,7 @@ export async function generateTasks(settings: Settings, ctx: AiContext): Promise
             properties: {
               title: Schema.string(),
               detail: Schema.string(),
-              kind: Schema.enumString({ enum: ['walk', 'ride', 'group'] }),
+              kind: Schema.enumString({ enum: ['walk', 'scan', 'ride'] }),
               poiId: Schema.enumString({ enum: POIS.map((p) => p.id) }),
               window: Schema.string(),
               rewardCells: Schema.integer(),
@@ -111,12 +111,12 @@ export async function generateTasks(settings: Settings, ctx: AiContext): Promise
       id: `g-${Date.now()}-${i}`,
       title: String(t.title || '').slice(0, 20),
       detail: String(t.detail || '').slice(0, 60),
-      kind: ['walk', 'ride', 'group'].includes(t.kind) ? t.kind : 'walk',
+      kind: ['walk', 'scan', 'ride'].includes(t.kind) ? t.kind : 'walk',
       poiId: poiById(t.poiId) ? t.poiId : 'sunyatsen',
       window: String(t.window || ''),
       rewardCells: Math.max(1, Math.min(20, Number(t.rewardCells) || 1)),
       rewardCredit: Math.max(0, Math.min(80, Number(t.rewardCredit) || 0)),
-      reason: String(t.reason || ''),
+      reason: String(t.reason || '').slice(0, 30),
     }))
     if (!tasks.length) throw new Error('empty')
     setStatus({ state: 'live', detail: settings.model })
