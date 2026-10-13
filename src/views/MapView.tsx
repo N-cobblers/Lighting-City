@@ -7,18 +7,72 @@ import { generateTasks } from '../lib/ai'
 import { slotOf, SLOT_LABEL } from '../data/demo'
 import type { Task, TaskKind } from '../lib/types'
 import districts from '../data/districts.json'
+import { BASEMAP, MAP_PALETTE, isLight, type Phase } from '../lib/phase'
 import { SpriteAvatar } from './SpriteAvatar'
 
-const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark'
+/** 底圖載入失敗時的離線底圖（行政區界），顏色跟著時段。 */
+function fallbackStyle(phase: Phase): StyleSpecification {
+  const f = MAP_PALETTE[phase].fallback
+  return {
+    version: 8,
+    sources: { districts: { type: 'geojson', data: districts as any } },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': f.bg } },
+      { id: 'd-fill', type: 'fill', source: 'districts', paint: { 'fill-color': f.fill, 'fill-opacity': 1 } },
+      { id: 'd-line', type: 'line', source: 'districts', paint: { 'line-color': f.line, 'line-width': 1.2 } },
+    ],
+  }
+}
 
-const FALLBACK_STYLE: StyleSpecification = {
-  version: 8,
-  sources: { districts: { type: 'geojson', data: districts as any } },
-  layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#0A1326' } },
-    { id: 'd-fill', type: 'fill', source: 'districts', paint: { 'fill-color': '#0F1C38', 'fill-opacity': 1 } },
-    { id: 'd-line', type: 'line', source: 'districts', paint: { 'line-color': '#2B3E6B', 'line-width': 1.2 } },
-  ],
+type Three<T> = [T, T, T]
+const byLevel = <T,>(v: Three<T>) => ['match', ['get', 'level'], 1, v[0], 2, v[1], v[2]] as any
+const times = (v: Three<number>, k: number) => v.map((x) => x * k) as Three<number>
+
+/** 點亮格子、格線、搭車軌跡的顏色與透明度。opacity 是「六角格深淺」（0–1）；亮色底圖上淡色看不清楚，所以白天乘兩倍。 */
+function applyPaint(map: MlMap, phase: Phase, opacity: number) {
+  if (!map.getLayer('lit-fill')) return
+  const p = MAP_PALETTE[phase]
+  const k = isLight(phase) ? Math.min(1, opacity * 2) : opacity
+  const outline: Three<number> = isLight(phase) ? [0.45, 0.7, 0.9] : [0.25, 0.5, 0.8]
+  map.setPaintProperty('area-line', 'line-color', p.grid)
+  map.setPaintProperty('area-line', 'line-opacity', 0.55 * k)
+  map.setPaintProperty('lit-fill', 'fill-color', byLevel(p.hex))
+  map.setPaintProperty('lit-fill', 'fill-opacity', byLevel(times(p.fill, k)))
+  map.setPaintProperty('lit-glow', 'line-color', byLevel(p.hex))
+  map.setPaintProperty('lit-glow', 'line-opacity', byLevel(times(p.glow, Math.min(1, opacity * 2))))
+  map.setPaintProperty('lit-line', 'line-color', byLevel(p.outline))
+  map.setPaintProperty('lit-line', 'line-opacity', byLevel(times(outline, k)))
+  map.setPaintProperty('trail-glow', 'line-color', p.trailGlow)
+  map.setPaintProperty('trail-core', 'line-color', p.trailCore)
+}
+
+/** 任務類型的線條圖示：步行是腳印、拍車是相機、搭車是車。 */
+function KindIcon({ kind }: { kind: TaskKind }) {
+  const common = { viewBox: '0 0 24 24', 'aria-hidden': true, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
+  if (kind === 'walk')
+    return (
+      <svg {...common}>
+        <path d="M8 3.5c1.7 0 2.6 2 2.3 4.4-.3 2-1.2 3.6-2.6 3.6S5.4 10 5.5 7.7C5.6 5.3 6.4 3.5 8 3.5Z" />
+        <path d="M6.2 15h3.2" />
+        <path d="M16 8.5c1.7 0 2.6 2 2.3 4.4-.3 2-1.2 3.6-2.6 3.6s-2.3-1.5-2.2-3.8c.1-2.4.9-4.2 2.5-4.2Z" />
+        <path d="M14.2 20h3.2" />
+      </svg>
+    )
+  if (kind === 'scan')
+    return (
+      <svg {...common}>
+        <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2L9.2 5h5.6l1.5 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z" />
+        <circle cx="12" cy="13" r="3.4" />
+      </svg>
+    )
+  return (
+    <svg {...common}>
+      <path d="M5.5 12.5 7.2 7.6A1.5 1.5 0 0 1 8.6 6.6h6.8a1.5 1.5 0 0 1 1.4 1L18.5 12.5" />
+      <path d="M4 12.5h16v4.5H4Z" />
+      <circle cx="7.6" cy="17.2" r="1.6" />
+      <circle cx="16.4" cy="17.2" r="1.6" />
+    </svg>
+  )
 }
 
 const KIND_LABEL: Record<TaskKind, string> = { walk: '步行', scan: '拍車', ride: '搭 yoxi' }
@@ -51,12 +105,15 @@ export function MapView() {
   const [genBusy, setGenBusy] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(true)
   const [sheetH, setSheetH] = useState(300)
-  const [pop, setPop] = useState<{ id: number; text: string } | null>(null)
+  const [pop, setPop] = useState<{ id: number; text: string; sparkle: boolean } | null>(null)
   const [idx, setIdx] = useState(0)
   const rail = useRef<HTMLUListElement>(null)
   const popId = useRef(0)
   const litRef = useRef(s.lit)
   const gridOpacityRef = useRef(gridOpacity)
+  const phaseRef = useRef(s.phase)
+  const usingFallback = useRef(false)
+  const fallbackRef = useRef<() => void>(() => {})
   litRef.current = s.lit
   gridOpacityRef.current = gridOpacity
   const sheetRef = useRef<HTMLElement>(null)
@@ -67,49 +124,50 @@ export function MapView() {
   }
   const slot = slotOf(s.now)
 
+  // 換底圖（setStyle）後圖層會清空，style.load 時重新疊上
   const addLayers = useCallback((map: MlMap) => {
     if (map.getSource('area')) return
-    const opacity = gridOpacityRef.current / 100
     map.addSource('area', { type: 'geojson', data: cellsFeatureCollection(AREA_CELLS) as any })
     map.addSource('lit', { type: 'geojson', data: cellsFeatureCollection(Object.keys(litRef.current), (c) => ({ level: litRef.current[c] })) as any })
     map.addSource('trail', { type: 'geojson', data: lineFeature([]) as any })
-    map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#2B3E6B', 'line-opacity': 0.55 * opacity, 'line-width': 0.8 } })
-    map.addLayer({
-      id: 'lit-fill',
-      type: 'fill',
-      source: 'lit',
-      paint: { 'fill-color': '#FFC94A', 'fill-opacity': ['interpolate', ['linear'], ['get', 'level'], 1, 0.16 * opacity, 2, 0.34 * opacity, 3, 0.58 * opacity] },
-    })
-    map.addLayer({ id: 'lit-line', type: 'line', source: 'lit', paint: { 'line-color': '#FFD873', 'line-opacity': ['interpolate', ['linear'], ['get', 'level'], 1, 0.25 * opacity, 3, 0.8 * opacity], 'line-width': 1 } })
-    map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FFC94A', 'line-width': 12, 'line-blur': 8, 'line-opacity': 0.65 } })
-    map.addLayer({ id: 'trail-core', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FFE9A8', 'line-width': 3 } })
+    map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-width': 0.8 } })
+    map.addLayer({ id: 'lit-fill', type: 'fill', source: 'lit', paint: {} })
+    // 熟悉、常去的格子外圍一圈光暈（白天不畫）
+    map.addLayer({ id: 'lit-glow', type: 'line', source: 'lit', layout: { 'line-join': 'round' }, paint: { 'line-width': byLevel([0, 6, 10]), 'line-blur': byLevel([0, 6, 10]) } })
+    map.addLayer({ id: 'lit-line', type: 'line', source: 'lit', paint: { 'line-width': 1 } })
+    map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': 12, 'line-blur': 8, 'line-opacity': 0.65 } })
+    map.addLayer({ id: 'trail-core', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': 3 } })
+    applyPaint(map, phaseRef.current, gridOpacityRef.current / 100)
   }, [])
 
   // map init
   useEffect(() => {
     if (!box.current) return
-    let usedFallback = false
-    const map = new maplibregl.Map({ container: box.current, style: DARK_STYLE, center: CENTER, zoom: 13.25, attributionControl: { compact: true }, pitchWithRotate: false, dragRotate: false })
+    const map = new maplibregl.Map({ container: box.current, style: BASEMAP[phaseRef.current], center: CENTER, zoom: 13.25, attributionControl: { compact: true }, pitchWithRotate: false, dragRotate: false })
     mapRef.current = map
     const fallback = () => {
-      if (usedFallback) return
-      usedFallback = true
-      setMapNote('底圖載入失敗，改用離線夜色底圖')
-      map.setStyle(FALLBACK_STYLE)
-      map.once('styledata', () => addLayers(map))
+      if (usingFallback.current) return
+      usingFallback.current = true
+      setMapNote('底圖載入失敗，改用離線底圖')
+      map.setStyle(fallbackStyle(phaseRef.current), { diff: false })
     }
+    fallbackRef.current = fallback
     const timer = setTimeout(() => {
       if (!map.isStyleLoaded()) fallback()
     }, 7000)
-    map.on('load', () => {
+    map.on('style.load', () => {
       clearTimeout(timer)
       addLayers(map)
+      box.current?.classList.remove('swap')
+      if (!usingFallback.current) setMapNote('')
     })
     map.once('idle', () => {
       const b = new maplibregl.LngLatBounds([121.5495, 25.0275], [121.5785, 25.0630])
       map.fitBounds(b, { padding: { top: 70, bottom: sheetPad() + 10, left: 24, right: 24 }, duration: 0 })
     })
     map.on('error', (e: any) => {
+      // 單張圖磚載不到不算底圖失敗，只有樣式本身載不到才改用離線底圖
+      if (e?.sourceId || e?.tile) return
       const msg = String(e?.error?.message || '')
       if (!map.isStyleLoaded() && /style|Failed to fetch|NetworkError|load/i.test(msg)) fallback()
     })
@@ -141,12 +199,36 @@ export function MapView() {
 
   useEffect(() => {
     const map = mapRef.current
-    const opacity = gridOpacity / 100
-    if (!map?.getLayer('area-line') || !map.getLayer('lit-fill') || !map.getLayer('lit-line')) return
-    map.setPaintProperty('area-line', 'line-opacity', 0.55 * opacity)
-    map.setPaintProperty('lit-fill', 'fill-opacity', ['interpolate', ['linear'], ['get', 'level'], 1, 0.16 * opacity, 2, 0.34 * opacity, 3, 0.58 * opacity])
-    map.setPaintProperty('lit-line', 'line-opacity', ['interpolate', ['linear'], ['get', 'level'], 1, 0.25 * opacity, 3, 0.8 * opacity])
+    if (map) applyPaint(map, phaseRef.current, gridOpacity / 100)
   }, [gridOpacity])
+
+  // 換時段：地圖先淡出，換成該時段的底圖，style.load 時重新疊上格子再淡入
+  useEffect(() => {
+    const prev = phaseRef.current
+    if (prev === s.phase) return
+    phaseRef.current = s.phase
+    const map = mapRef.current
+    if (!map) return
+    // 早晨和白天用同一張底圖，只換格子顏色
+    if (!usingFallback.current && BASEMAP[prev] === BASEMAP[s.phase]) {
+      applyPaint(map, s.phase, gridOpacityRef.current / 100)
+      return
+    }
+    box.current?.classList.add('swap')
+    // 每次換時段都重試線上底圖；先前改用離線底圖可能只是一時連不上
+    const swap = setTimeout(() => {
+      usingFallback.current = false
+      map.setStyle(BASEMAP[s.phase], { diff: false })
+    }, 250)
+    // 底圖一直載不到時改用離線底圖，地圖不會一直停在淡出的狀態
+    const guard = setTimeout(() => {
+      if (!map.isStyleLoaded()) fallbackRef.current()
+    }, 9000)
+    return () => {
+      clearTimeout(swap)
+      clearTimeout(guard)
+    }
+  }, [s.phase])
 
   // 小精靈跳出來的那句話，放在抽屜上緣
   useEffect(() => {
@@ -157,9 +239,9 @@ export function MapView() {
     return () => ro.disconnect()
   }, [])
 
-  const showPop = useCallback((text: string, ms = 2800) => {
+  const showPop = useCallback((text: string, ms = 2800, sparkle = true) => {
     const id = ++popId.current
-    setPop({ id, text })
+    setPop({ id, text, sparkle })
     setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms)
   }, [])
 
@@ -329,7 +411,7 @@ export function MapView() {
       setWaiting(minutes)
       mapRef.current?.resize()
       mapRef.current?.flyTo({ center: route.path[0], zoom: 14.2, duration: 800 })
-      showPop('等車時看看今天點亮了哪裡～', 3400)
+      showPop('等車時看看今天點亮了哪裡～', 3400, false)
       await new Promise((r) => setTimeout(r, 3600))
       setWaiting(null)
       ride(route, undefined, boost)
@@ -397,8 +479,8 @@ export function MapView() {
           </span>
           <em>7 天沒經過淡一階，不會消失</em>
         </div>
+        {mapNote && <div className="map-note">{mapNote}</div>}
       </div>
-      {mapNote && <div className="map-note">{mapNote}</div>}
       {waiting !== null && (
         <div className="ride-banner" role="status">
           <span className="dot" /> 等車中・司機約 {waiting} 分鐘到
@@ -411,7 +493,17 @@ export function MapView() {
       )}
       {pop && (
         <div key={pop.id} className="sprite-pop" style={{ bottom: sheetH + 8 }} role="status">
-          <SpriteAvatar size={52} mood="wow" />
+          <span className="who-pop">
+            <SpriteAvatar size={52} mood="wow" phase={s.phase} />
+            {pop.sparkle && (
+              <span className="sparks" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
+          </span>
           <span className="pop-bubble">{pop.text}</span>
         </div>
       )}
@@ -429,7 +521,7 @@ export function MapView() {
         ) : (
           <>
             <div className="sheet-head">
-              <SpriteAvatar size={44} />
+              <SpriteAvatar size={44} phase={s.phase} />
               <div className="sheet-title">
                 <strong>今日 AI 任務・{SLOT_LABEL[slot]}</strong>
                 <span className="muted">{genBusy ? '小精靈正在依天氣、常用地點與空車低谷排任務…' : s.greeting || '　'}</span>
@@ -453,7 +545,10 @@ export function MapView() {
                       <li key={t.id} className="slide" aria-label={`第 ${i + 1} 張，共 ${cards.length} 張`}>
                         <div className={`task ${t.done ? 'done' : ''}`}>
                           <div className="task-top">
-                            <span className={`kind kind-${t.kind}`}>{KIND_LABEL[t.kind]}</span>
+                            <span className={`kind kind-${t.kind}`}>
+                              <KindIcon kind={t.kind} />
+                              {KIND_LABEL[t.kind]}
+                            </span>
                             <span className="window">{t.window}</span>
                           </div>
                           <strong className="task-title">{t.title}</strong>

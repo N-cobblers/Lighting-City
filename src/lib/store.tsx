@@ -6,6 +6,7 @@ import { AREA_SET, RES, cellAt, poiById, routeById, routeCells } from './geo'
 import { PERSONA, slotOf } from '../data/demo'
 import { luckyNumber } from './lucky'
 import { fetchCwa, rainScenario } from './weather'
+import { phaseOf, type Phase } from './phase'
 import demand from '../data/demand.json'
 
 export type Tab = 'map' | 'scan' | 'friends' | 'sprite'
@@ -117,6 +118,8 @@ type Store = {
   setClock: (h: number, m: number) => void
   resetClock: () => void
   clockIsSim: boolean
+  /** 依（劇本）時間算出的時段：早晨、白天、黃昏、夜晚 */
+  phase: Phase
   weather: Weather
   lucky: number
   lit: Record<string, number>
@@ -269,6 +272,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setClock: (h, m) => setSimClock({ h, m }),
     resetClock: () => setSimClock(null),
     clockIsSim: !!simClock,
+    phase: phaseOf(now),
     weather,
     lucky: luckyNumber(now, settings.luckyOverride),
     lit,

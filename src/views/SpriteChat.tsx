@@ -114,7 +114,7 @@ export function SpriteChat() {
   return (
     <div className="chat-view">
       <header className="chat-head">
-        <SpriteAvatar size={48} />
+        <SpriteAvatar size={48} phase={s.phase} />
         <div>
           <strong>車燈小精靈</strong>
           <span className="muted small">知道你的常用地點、時段和今天的天氣</span>
