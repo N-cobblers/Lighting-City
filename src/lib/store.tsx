@@ -7,12 +7,13 @@ import { PERSONA, slotOf } from '../data/demo'
 import { luckyNumber } from './lucky'
 import { fetchCwa, rainScenario } from './weather'
 import { phaseOf, type Phase } from './phase'
+import { applyOffpeak, emptyOffpeak, liveShimmer, sanitizeOffpeak, type OffpeakState } from './offpeak'
 import demand from '../data/demand.json'
 
 export type Tab = 'map' | 'scan' | 'friends' | 'sprite'
 export type Toast = { id: number; text: string; tone?: 'lamp' | 'plain' }
-/** 從小精靈或任務卡發出的搭車請求。boost 2 = 預約或錯峰，路線亮兩階；waitMin 有值時先顯示等車。 */
-export type RideRequest = { routeId?: string; taskId?: string; boost?: number; waitMin?: number }
+/** 從小精靈或任務卡發出的搭車請求。reserved = 預約（一律算錯峰，路線亮兩階）；waitMin 有值時先顯示等車。 */
+export type RideRequest = { routeId?: string; taskId?: string; reserved?: boolean; waitMin?: number }
 
 const LIT_KEY = 'yoxi-lighting-city:lit:v6'
 const VISIT_KEY = 'yoxi-lighting-city:visits:v2'
@@ -21,6 +22,7 @@ const LEGACY_VISIT_KEYS = ['yoxi-lighting-city:visits:v1']
 const COL_KEY = 'yoxi-lighting-city:collected:v1'
 const FORECAST_SEEN_KEY = 'yoxi-lighting-city:forecast-seen:v1'
 const HOME_RIDE_KEY = 'yoxi-lighting-city:home-ride:v1'
+const OFFPEAK_KEY = 'yoxi-lighting-city:offpeak:v1'
 const DAY_MS = 24 * 60 * 60 * 1000
 const GLOW_FADE_DAYS = 7
 
@@ -148,6 +150,12 @@ type Store = {
   markHomeRide: () => void
   forecastSeenKey: string
   markForecastSeen: (key: string) => void
+  /** 錯峰點燈：記一趟錯峰行程經過的格子，回傳這次算到幾格、換到幾點和泰 Points */
+  recordOffpeak: (cells: string[]) => { counted: number; newPoints: number; light: number }
+  /** 3 天內錯峰點亮、地圖上要閃爍的格子 */
+  shimmer: string[]
+  /** 本月錯峰之光與和泰 Points（給小精靈的「查進度」工具） */
+  offpeakSummary: { light: number; points: number }
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -169,6 +177,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [focusTask, setFocusTask] = useState<string | null>(null)
   const [homeRideDay, setHomeRideDay] = useState(() => readJSON(HOME_RIDE_KEY, ''))
   const [forecastSeenKey, setForecastSeenKey] = useState(() => readJSON(FORECAST_SEEN_KEY, ''))
+  const [offpeak, setOffpeak] = useState<OffpeakState>(() => sanitizeOffpeak(readJSON(OFFPEAK_KEY, null)))
+  const offpeakRef = useRef(offpeak)
   const toastId = useRef(0)
   const baseLitRef = useRef(baseLit)
   const visitsRef = useRef(visits)
@@ -198,6 +208,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => writeJSON(COL_KEY, collected), [collected])
   useEffect(() => writeJSON(FORECAST_SEEN_KEY, forecastSeenKey), [forecastSeenKey])
   useEffect(() => writeJSON(HOME_RIDE_KEY, homeRideDay), [homeRideDay])
+  useEffect(() => writeJSON(OFFPEAK_KEY, offpeak), [offpeak])
 
   useEffect(() => {
     let cancelled = false
@@ -259,6 +270,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { newCells, renewedCells }
   }, [])
 
+  const recordOffpeak = useCallback((cells: string[]) => {
+    const r = applyOffpeak(offpeakRef.current, cells)
+    offpeakRef.current = r.next
+    setOffpeak(r.next)
+    return { counted: r.counted, newPoints: r.newPoints, light: r.next.light }
+  }, [])
+
+  const shimmer = useMemo(() => Object.keys(liveShimmer(offpeak.shimmer, Date.now())), [offpeak, now])
+
   const litPct = useMemo(() => {
     let n = 0
     for (const c of Object.keys(lit)) if (AREA_SET.has(c)) n++
@@ -287,12 +307,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setBaseLit(nextBase)
       setVisits(nextVisits)
       setCollected([])
+      offpeakRef.current = emptyOffpeak()
+      setOffpeak(offpeakRef.current)
     },
     tasks,
     greeting,
     tasksSource,
     setTasks: (t, g, s) => {
-      setTaskList(t)
+      // 小精靈排好的卡（晚點走、準時預約）換時段也留著，早上決定、傍晚還能出發
+      setTaskList((prev) => [...t, ...prev.filter((x) => x.pinned && !x.done && !t.some((y) => y.id === x.id))])
       setGreeting(g)
       setTasksSource(s)
     },
@@ -312,6 +335,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     markHomeRide: () => setHomeRideDay(new Date().toDateString()),
     forecastSeenKey,
     markForecastSeen: setForecastSeenKey,
+    recordOffpeak,
+    shimmer,
+    offpeakSummary: { light: offpeak.light, points: offpeak.points },
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

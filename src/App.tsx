@@ -54,10 +54,10 @@ function SkyIcon({ phase }: { phase: Phase }) {
 }
 
 const SCRIPT = [
-  { label: '早上 08:30', h: 8, m: 30, tab: 'map' as Tab, note: '小精靈送上今日任務與幸運數字' },
+  { label: '早上 08:30', h: 8, m: 30, tab: 'map' as Tab, note: '小精靈預報今天 18 點難叫，選「晚點走」' },
   { label: '午休 12:30', h: 12, m: 30, tab: 'map' as Tab, note: '完成步行任務，點亮一格新街區' },
   { label: '路上 15:00', h: 15, m: 0, tab: 'scan' as Tab, note: '遇見 yoxi 車，拍車牌召喚小精靈' },
-  { label: '傍晚 18:05', h: 18, m: 5, tab: 'sprite' as Tab, note: '小精靈預報：準時預約、晚點走或現在走' },
+  { label: '傍晚 18:05', h: 18, m: 5, tab: 'map' as Tab, note: '按 19:00 的卡出發：錯峰點燈換 Points' },
 ]
 
 export default function App() {

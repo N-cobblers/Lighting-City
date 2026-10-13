@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore, LOW_WINDOWS } from '../lib/store'
-import { chatReply, type ChatTurn } from '../lib/ai'
+import { chatWithTools, type ChatTurn } from '../lib/ai'
+import type { Proposal } from '../lib/tools'
 import { forecastText, nextRideForecast, LATER_HOUR } from '../lib/forecast'
+import { CITY_DEMO } from '../lib/offpeak'
 import { slotOf } from '../data/demo'
 import { SpriteAvatar } from './SpriteAvatar'
 import type { Source } from '../lib/types'
 
-type Msg = ChatTurn & { source?: Source; tag?: string }
+type Msg = ChatTurn & { source?: Source; tag?: string; tools?: string[] }
 type Choice = '準時預約' | '晚點走' | '現在走'
 
-const QUICK = ['今晚會下雨嗎？', '幫我預約回家', '午休去哪走走？', '今天的幸運數字是？']
+const QUICK = ['明天 8 點從公司叫車好叫嗎？', '幫我避開尖峰', '我今天還有哪些任務？', '今晚會下雨嗎？', '今天的幸運數字是？']
 const CHOICES: Choice[] = ['準時預約', '晚點走', '現在走']
 const LATER_TASK_ID = 'later-home'
 const RESERVED_TASK_ID = 'reserved-home'
@@ -24,12 +26,16 @@ export function SpriteChat() {
   // 哪一則小精靈訊息底下要顯示「準時預約／晚點走／現在走」
   const [choiceAt, setChoiceAt] = useState(-1)
   const [focusCard, setFocusCard] = useState<string | null>(null)
+  // 小精靈用「排錯峰」工具提出的方案，玩家按確認才加任務卡
+  const [proposal, setProposal] = useState<Proposal | null>(null)
   const end = useRef<HTMLDivElement>(null)
-  const forecast = nextRideForecast(s.now, s.homeRideDay === new Date().toDateString())
+  const forecast = nextRideForecast(s.now, s.homeRideDay === new Date().toDateString(), s.weather.eveningPop)
+  // 錯峰點燈只給城市層級的數字（示範），放在三個選擇旁邊
+  const cityLine = forecast.isToday ? `今天已有 ${CITY_DEMO.today} 人選「晚點走」` : `已有 ${CITY_DEMO.tomorrow} 人先排好${forecast.when.replace(` 18 點`, '')}晚點走`
 
   useEffect(() => {
     if (msgs.length) return
-    setMsgs([{ role: 'model', text: forecastText(forecast, s.weather.eveningPop), source: 'demo', tag: 'yoxi 需求資料' }])
+    setMsgs([{ role: 'model', text: forecastText(forecast, s.weather.eveningPop), source: 'demo', tag: 'LightGBM 預測' }])
     setChoiceAt(0)
     s.markForecastSeen(forecast.key)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,21 +56,22 @@ export function SpriteChat() {
   const choose = (c: Choice) => {
     setChoiceAt(-1)
     setFocusCard(null)
+    setProposal(null)
     const later = forecast.laterLead.toFixed(1)
     if (c === '現在走') {
       say(c, `好，現在幫你叫車！司機約 ${forecast.nowWait} 分鐘到，等車時我陪你。`)
-      goRide({ routeId: 'evening-home', boost: 1, waitMin: forecast.nowWait })
+      goRide({ routeId: 'evening-home', reserved: false, waitMin: forecast.nowWait })
       return
     }
     if (c === '準時預約') {
       if (forecast.isNow) {
         const pickup = new Date(s.now.getTime() + 5 * 60000)
         say(c, `好，幫你預約 ${hhmm(pickup)} 從市府路上車點出發。準時出發，路線亮兩階！`)
-        goRide({ routeId: 'evening-home', boost: 2 })
+        goRide({ routeId: 'evening-home', reserved: true })
         return
       }
       if (forecast.isToday) {
-        s.addTask({ id: RESERVED_TASK_ID, title: '已預約 18:10 回家', detail: '18:10 從市府路上車點出發，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '18:10', rewardCells: 12, rewardCredit: 0, reason: '預約讓司機提早安排，尖峰也準時' })
+        s.addTask({ id: RESERVED_TASK_ID, title: '已預約 18:10 回家', detail: '18:10 從市府路上車點出發，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '18:10', rewardCells: 12, rewardCredit: 0, reason: '預約讓司機提早安排，尖峰也準時', pinned: true })
         setFocusCard(RESERVED_TASK_ID)
         say(c, '好，幫你預約今天 18:10 從市府路上車點出發，已放進今日任務。準時出發，路線亮兩階！')
         return
@@ -74,7 +81,7 @@ export function SpriteChat() {
     }
     // 晚點走
     if (forecast.isToday) {
-      s.addTask({ id: LATER_TASK_ID, title: `${LATER_HOUR}:00 從市府回家`, detail: `${LATER_HOUR} 點後出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${LATER_HOUR}:00–${LATER_HOUR}:30`, rewardCells: 12, rewardCredit: 0, reason: `${LATER_HOUR} 點後信義區叫車到上車約 ${later} 分` })
+      s.addTask({ id: LATER_TASK_ID, title: `${LATER_HOUR}:00 從市府回家`, detail: `${LATER_HOUR} 點後出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${LATER_HOUR}:00–${LATER_HOUR}:30`, rewardCells: 12, rewardCredit: 0, reason: `${LATER_HOUR} 點後${forecast.place}叫車到上車約 ${later} 分`, pinned: true })
       setFocusCard(LATER_TASK_ID)
       say(c, `好，${LATER_HOUR}:00 後再走，那時叫車到上車約 ${later} 分，搭了亮兩階。已放進今日任務最後一張。`)
       return
@@ -89,26 +96,33 @@ export function SpriteChat() {
     setBusy(true)
     setChoiceAt(-1)
     setFocusCard(null)
+    setProposal(null)
     const history = msgs.slice(1).map(({ role, text }) => ({ role, text }))
     const at = msgs.length + 1
     setMsgs((m) => [...m, { role: 'user', text: t }, { role: 'model', text: '' }])
     const ctx = { now: s.now, slot: slotOf(s.now), weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, tasks: s.tasks }
-    let reply = ''
-    const source = await chatReply(s.settings, ctx, history, t, (partial) => {
-      reply = partial
-      setMsgs((m) => {
-        const next = m.slice()
-        next[next.length - 1] = { role: 'model', text: partial }
-        return next
-      })
-    })
+    const toolCtx = { now: s.now, eveningPop: s.weather.eveningPop, tasks: s.tasks, litPct: s.litPct, offpeak: s.offpeakSummary }
+    const r = await chatWithTools(s.settings, ctx, toolCtx, history, t)
     setMsgs((m) => {
       const next = m.slice()
-      next[next.length - 1] = { ...next[next.length - 1], source }
+      next[next.length - 1] = { role: 'model', text: r.text, source: r.source, tools: r.tools }
       return next
     })
-    if (/預約|叫車|回家/.test(reply)) setChoiceAt(at)
+    if (r.proposal) setProposal(r.proposal)
+    else if (!r.tools.length && /預約|叫車|回家/.test(r.text)) setChoiceAt(at)
     setBusy(false)
+  }
+
+  const confirmProposal = (ok: boolean) => {
+    if (!proposal) return
+    if (ok) {
+      s.addTask(proposal.task)
+      setFocusCard(proposal.task.id)
+      say('確認', `好，已排進今天的任務：${proposal.summary}。`)
+    } else {
+      say('先不用', '好，先不排，想錯峰的時候再叫我。')
+    }
+    setProposal(null)
   }
 
   return (
@@ -131,10 +145,21 @@ export function SpriteChat() {
                   <i />
                 </span>
               )}
-              {m.role === 'model' && (m.tag || (m.source && i > 0)) && <span className={m.source === 'live' && !m.tag ? 'src live' : 'src'}>{m.tag || (m.source === 'live' ? 'Gemini' : '示範')}</span>}
+              {m.role === 'model' && (m.tag || (m.source && i > 0)) && (
+                <span className={m.source === 'live' && !m.tag ? 'src live' : 'src'}>
+                  {m.tag || (m.source === 'live' ? 'Gemini' : '示範')}
+                  {m.tools?.length ? `・用了工具：${m.tools.join('、')}` : ''}
+                </span>
+              )}
             </div>
             {i === choiceAt && !busy && (
               <div className="chat-choices" role="group" aria-label="怎麼出發">
+                {i === 0 && (
+                  <p className="city-line">
+                    {cityLine}
+                    <span className="demo-mini">示範</span>
+                  </p>
+                )}
                 {CHOICES.map((c) => (
                   <button key={c} className={c === '準時預約' ? 'btn-lamp' : 'btn-ghost'} onClick={() => choose(c)}>
                     {c}
@@ -144,6 +169,20 @@ export function SpriteChat() {
             )}
           </div>
         ))}
+        {proposal && !busy && (
+          <div className="proposal" role="group" aria-label="小精靈的錯峰提案">
+            <strong>錯峰提案</strong>
+            <p>{proposal.summary}</p>
+            <div className="chat-choices">
+              <button className="btn-lamp" onClick={() => confirmProposal(true)}>
+                確認排進任務
+              </button>
+              <button className="btn-ghost" onClick={() => confirmProposal(false)}>
+                先不用
+              </button>
+            </div>
+          </div>
+        )}
         {focusCard && (
           <div className="chat-choices">
             <button

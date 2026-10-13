@@ -8,6 +8,7 @@ import { slotOf, SLOT_LABEL } from '../data/demo'
 import type { Task, TaskKind } from '../lib/types'
 import districts from '../data/districts.json'
 import { BASEMAP, MAP_PALETTE, isLight, type Phase } from '../lib/phase'
+import { CELLS_PER_POINT, isOffpeak } from '../lib/offpeak'
 import { SpriteAvatar } from './SpriteAvatar'
 
 /** 底圖載入失敗時的離線底圖（行政區界），顏色跟著時段。 */
@@ -44,7 +45,14 @@ function applyPaint(map: MlMap, phase: Phase, opacity: number) {
   map.setPaintProperty('lit-line', 'line-opacity', byLevel(times(outline, k)))
   map.setPaintProperty('trail-glow', 'line-color', p.trailGlow)
   map.setPaintProperty('trail-core', 'line-color', p.trailCore)
+  map.setPaintProperty('offpeak-glow', 'line-color', shimmerColor(phase))
+  map.setPaintProperty('offpeak-glow', 'line-opacity', shimmerOpacity(opacity, true))
 }
+
+/** 錯峰點亮的格子和一般點亮同色，多一層閃爍的光；白底上白熱光看不到，白天用琥珀色。 */
+const shimmerColor = (phase: Phase) => (isLight(phase) ? MAP_PALETTE[phase].hex[1] : MAP_PALETTE[phase].hex[2])
+const shimmerOpacity = (opacity: number, bright: boolean) => (bright ? 0.95 : 0.2) * Math.min(1, opacity * 2)
+const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 /** 任務類型的線條圖示：步行是腳印、拍車是相機、搭車是車。 */
 function KindIcon({ kind }: { kind: TaskKind }) {
@@ -112,6 +120,17 @@ export function MapView() {
   const litRef = useRef(s.lit)
   const gridOpacityRef = useRef(gridOpacity)
   const phaseRef = useRef(s.phase)
+  const nowRef = useRef(s.now)
+  const shimmerRef = useRef(s.shimmer)
+  // 最近一趟的軌跡；換底圖重新疊圖層時接著畫，不會整條消失
+  const trailRef = useRef<LngLat[]>([])
+  // 底圖是否載好；剛換時段時還在載入，搭車要等它好了再開始
+  const styleReady = useRef(false)
+  const swapPending = useRef(false)
+  const tabRef = useRef(s.tab)
+  nowRef.current = s.now
+  shimmerRef.current = s.shimmer
+  tabRef.current = s.tab
   const usingFallback = useRef(false)
   const fallbackRef = useRef<() => void>(() => {})
   litRef.current = s.lit
@@ -129,12 +148,15 @@ export function MapView() {
     if (map.getSource('area')) return
     map.addSource('area', { type: 'geojson', data: cellsFeatureCollection(AREA_CELLS) as any })
     map.addSource('lit', { type: 'geojson', data: cellsFeatureCollection(Object.keys(litRef.current), (c) => ({ level: litRef.current[c] })) as any })
-    map.addSource('trail', { type: 'geojson', data: lineFeature([]) as any })
+    map.addSource('trail', { type: 'geojson', data: lineFeature(trailRef.current.length > 1 ? trailRef.current : []) as any })
     map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-width': 0.8 } })
     map.addLayer({ id: 'lit-fill', type: 'fill', source: 'lit', paint: {} })
     // 熟悉、常去的格子外圍一圈光暈（白天不畫）
     map.addLayer({ id: 'lit-glow', type: 'line', source: 'lit', layout: { 'line-join': 'round' }, paint: { 'line-width': byLevel([0, 6, 10]), 'line-blur': byLevel([0, 6, 10]) } })
     map.addLayer({ id: 'lit-line', type: 'line', source: 'lit', paint: { 'line-width': 1 } })
+    // 錯峰點燈的格子：3 天內多一層慢慢閃爍的光（透明度用 transition 漸變）
+    map.addSource('offpeak', { type: 'geojson', data: cellsFeatureCollection(shimmerRef.current) as any })
+    map.addLayer({ id: 'offpeak-glow', type: 'line', source: 'offpeak', layout: { 'line-join': 'round' }, paint: { 'line-width': 5, 'line-blur': 4, 'line-opacity-transition': { duration: 1600, delay: 0 } } as any })
     map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': 12, 'line-blur': 8, 'line-opacity': 0.65 } })
     map.addLayer({ id: 'trail-core', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': 3 } })
     applyPaint(map, phaseRef.current, gridOpacityRef.current / 100)
@@ -149,6 +171,7 @@ export function MapView() {
       if (usingFallback.current) return
       usingFallback.current = true
       setMapNote('底圖載入失敗，改用離線底圖')
+      styleReady.current = false
       map.setStyle(fallbackStyle(phaseRef.current), { diff: false })
     }
     fallbackRef.current = fallback
@@ -157,6 +180,7 @@ export function MapView() {
     }, 7000)
     map.on('style.load', () => {
       clearTimeout(timer)
+      styleReady.current = true
       addLayers(map)
       box.current?.classList.remove('swap')
       if (!usingFallback.current) setMapNote('')
@@ -202,6 +226,25 @@ export function MapView() {
     if (map) applyPaint(map, phaseRef.current, gridOpacity / 100)
   }, [gridOpacity])
 
+  useEffect(() => {
+    const src = mapRef.current?.getSource('offpeak') as maplibregl.GeoJSONSource | undefined
+    if (src) src.setData(cellsFeatureCollection(s.shimmer) as any)
+  }, [s.shimmer])
+
+  // 錯峰之光慢慢閃：每 2 秒在亮、暗之間切換，transition 讓它漸變；系統開「減少動態效果」時保持不動。
+  // 沒有閃爍格子或不在地圖分頁時不動，免得地圖一直重畫
+  useEffect(() => {
+    if (reducedMotion()) return
+    let bright = true
+    const id = setInterval(() => {
+      const map = mapRef.current
+      if (!map?.getLayer('offpeak-glow') || !shimmerRef.current.length || tabRef.current !== 'map') return
+      bright = !bright
+      map.setPaintProperty('offpeak-glow', 'line-opacity', shimmerOpacity(gridOpacityRef.current / 100, bright))
+    }, 2000)
+    return () => clearInterval(id)
+  }, [])
+
   // 換時段：地圖先淡出，換成該時段的底圖，style.load 時重新疊上格子再淡入
   useEffect(() => {
     const prev = phaseRef.current
@@ -215,18 +258,29 @@ export function MapView() {
       return
     }
     box.current?.classList.add('swap')
+    swapPending.current = true
+    // 只看新底圖的 style.load 有沒有來；不能用 isStyleLoaded()，搭車動畫每一格都在更新軌跡，那時它一直是 false
+    let loaded = false
+    const onLoad = () => {
+      loaded = true
+    }
+    map.once('style.load', onLoad)
     // 每次換時段都重試線上底圖；先前改用離線底圖可能只是一時連不上
     const swap = setTimeout(() => {
+      swapPending.current = false
+      styleReady.current = false
       usingFallback.current = false
       map.setStyle(BASEMAP[s.phase], { diff: false })
     }, 250)
     // 底圖一直載不到時改用離線底圖，地圖不會一直停在淡出的狀態
     const guard = setTimeout(() => {
-      if (!map.isStyleLoaded()) fallbackRef.current()
+      if (!loaded) fallbackRef.current()
     }, 9000)
     return () => {
       clearTimeout(swap)
       clearTimeout(guard)
+      swapPending.current = false
+      map.off('style.load', onLoad)
     }
   }, [s.phase])
 
@@ -256,9 +310,10 @@ export function MapView() {
   }, [])
 
   // tasks
-  const regenerate = useCallback(async () => {
+  // 換時段時先用當天的任務快取；按「重新生成」才強制再問一次 Gemini
+  const regenerate = useCallback(async (force = false) => {
     setGenBusy(true)
-    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS })
+    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS }, { force })
     s.setTasks(r.tasks, r.greeting, r.source)
     setGenBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,14 +401,20 @@ export function MapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.focusTask, s.tab, idsSig])
 
+  // reserved = 預約（任務卡、準時預約）。預約一律算錯峰；現在出發要避開尖峰才算。錯峰的路線亮兩階並累積錯峰之光
   const ride = useCallback(
-    async (route: Route, task?: Task, boost = 1) => {
+    async (route: Route, task?: Task, reserved = false) => {
       const map = mapRef.current
       if (!map || riding) return
+      const offpeak = isOffpeak(nowRef.current, reserved)
+      const boost = offpeak ? 2 : 1
       map.resize()
       map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 })
       const cells = routeCells(route.path)
       setSheetOpen(false)
+      // 剛換時段時新底圖還在載入；等它載好再開始，搭到一半換底圖會把軌跡蓋掉（最多等 5 秒）。先標成搭車中，按鈕不會被按第二次
+      setRiding({ name: route.name, minutes: route.minutes, pct: 0 })
+      for (let i = 0; i < 50 && (swapPending.current || !styleReady.current); i++) await new Promise((r) => setTimeout(r, 100))
       const bounds = new maplibregl.LngLatBounds(route.path[0], route.path[0])
       route.path.forEach((p) => bounds.extend(p))
       map.fitBounds(bounds, { padding: { top: 160, bottom: 150, left: 50, right: 50 }, duration: 900, maxZoom: 13.9 })
@@ -367,12 +428,20 @@ export function MapView() {
       setRiding({ name: route.name, minutes: route.minutes, pct: 0 })
       await new Promise<void>((resolve) => {
         const t0 = performance.now()
+        let shown = -1
+        let shownAt = 0
         const frame = (now: number) => {
           const t = Math.min(1, (now - t0) / D)
           const pos = interpolateAlong(route.path, t)
           carRef.current?.setLngLat(pos)
+          // 軌跡最多每 120 毫秒更新一次（最後一格一定更新）；每一格都 setData 會讓地圖的 worker 排隊，畫面跟不上
           const trail = samples.filter((x) => x.t <= t).map((x) => x.p)
-          ;(map.getSource('trail') as maplibregl.GeoJSONSource | undefined)?.setData(lineFeature(trail.length > 1 ? trail : []) as any)
+          trailRef.current = trail
+          if (trail.length !== shown && (t >= 1 || now - shownAt > 120)) {
+            shown = trail.length
+            shownAt = now
+            ;(map.getSource('trail') as maplibregl.GeoJSONSource | undefined)?.setData(lineFeature(trail.length > 1 ? trail : []) as any)
+          }
           const fresh = cells.filter((c) => c.t <= t && !lit.has(c.cell)).map((c) => c.cell)
           if (fresh.length) {
             fresh.forEach((c) => lit.add(c))
@@ -392,20 +461,29 @@ export function MapView() {
       if (task) s.completeTask(task.id)
       if (route.id === 'evening-home') s.markHomeRide()
       glowAt(route.path[route.path.length - 1])
-      const head = boost > 1 ? '聰明出行，路線亮兩階！' : '搭 yoxi 抵達！'
+      const head = offpeak ? '錯峰點燈，路線亮兩階！' : '搭 yoxi 抵達！'
       showPop(
         newCells > 0 ? `${head}首次點亮 ${newCells} 格${renewedCells ? `，${renewedCells} 格熟悉的光更亮了` : ''}` : `${head}${renewedCells} 格熟悉的足跡重新亮起`,
         3600,
       )
+      // 個人的 Points 只在換到的這一刻出現
+      if (offpeak) {
+        const r = s.recordOffpeak(cells.map((c) => c.cell))
+        if (r.newPoints > 0)
+          setTimeout(
+            () => showPop(r.newPoints === 1 ? `錯峰之光滿 ${CELLS_PER_POINT} 格，換到 1 點和泰 Points！` : `錯峰之光累積 ${r.light} 格，換到 ${r.newPoints} 點和泰 Points！`, 5200),
+            3700,
+          )
+      }
       setTimeout(() => carRef.current?.remove(), 2500)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [riding, s.lightCells, s.recordRideCells, glowAt, showPop],
+    [riding, s.lightCells, s.recordRideCells, s.recordOffpeak, glowAt, showPop],
   )
 
   // 小精靈「現在走」：先等車，小精靈陪你，再開始搭車
   const waitThenRide = useCallback(
-    async (route: Route, minutes: number, boost = 1) => {
+    async (route: Route, minutes: number, reserved = false) => {
       if (riding || waiting !== null) return
       setSheetOpen(false)
       setWaiting(minutes)
@@ -414,7 +492,7 @@ export function MapView() {
       showPop('等車時看看今天點亮了哪裡～', 3400, false)
       await new Promise((r) => setTimeout(r, 3600))
       setWaiting(null)
-      ride(route, undefined, boost)
+      ride(route, undefined, reserved)
     },
     [riding, waiting, ride, showPop],
   )
@@ -426,8 +504,8 @@ export function MapView() {
     s.requestRide(null)
     const t = r.taskId ? s.tasks.find((x) => x.id === r.taskId) : undefined
     const route = t ? taskRoute(t) : routeById(r.routeId || 'evening-home') || routeById('evening-home')
-    if (r.waitMin) waitThenRide(route, r.waitMin, r.boost)
-    else ride(route, t, r.boost ?? (t ? 2 : 1))
+    if (r.waitMin) waitThenRide(route, r.waitMin, !!r.reserved)
+    else ride(route, t, r.reserved ?? !!t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pendingRide])
 
@@ -526,7 +604,7 @@ export function MapView() {
                 <strong>今日 AI 任務・{SLOT_LABEL[slot]}</strong>
                 <span className="muted">{genBusy ? '小精靈正在依天氣、常用地點與空車低谷排任務…' : s.greeting || '　'}</span>
               </div>
-              <button className="btn-ghost" onClick={regenerate} disabled={genBusy} aria-label="重新生成任務">
+              <button className="btn-ghost" onClick={() => regenerate(true)} disabled={genBusy} aria-label="重新生成任務">
                 {genBusy ? '生成中' : '重新生成'}
               </button>
             </div>
@@ -562,7 +640,7 @@ export function MapView() {
                             {t.done ? (
                               <span className="done-label">✓ 已完成</span>
                             ) : t.kind === 'ride' ? (
-                              <button className="btn-lamp" disabled={busy} onClick={() => ride(taskRoute(t), t, 2)}>
+                              <button className="btn-lamp" disabled={busy} onClick={() => ride(taskRoute(t), t, true)}>
                                 預約 yoxi
                               </button>
                             ) : t.kind === 'scan' ? (

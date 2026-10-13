@@ -92,4 +92,19 @@ npx firebase-tools deploy --only hosting,firestore:rules
 npm install
 npm run dev      # 本機開發
 npm run build    # 輸出到 dist/
+npm test         # 單元測試（vitest）
 ```
+
+### 錯峰點燈後端（Cloud Functions）
+
+`functions/` 是錯峰點燈的後端原型：`recordTrip` 判斷是否錯峰、用行程編號防止重複計點、同一格一天只算一次、每人每月 Points 上限 20 點，並把城市錯峰人數寫成公開值（每區每小時未滿 20 人不顯示，取整到 10）。安全規則在 `firestore.rules`。正式部署需要 Firebase Blaze 方案；目前在本機模擬器測試：
+
+```bash
+# 需要 Node 24.12 以上、Java 21 以上
+cd functions
+npm ci
+npm test                # 單元測試
+npm run test:emulator   # 建置後啟動 auth、firestore、functions 模擬器，跑規則與 recordTrip 測試
+```
+
+每個 PR 會由 GitHub Actions（`.github/workflows/ci.yml`）自動跑 App 建置與單元測試、模擬器測試與 e2e。

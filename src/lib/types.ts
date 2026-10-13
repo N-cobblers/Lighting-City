@@ -12,6 +12,8 @@ export type Task = {
   rewardCredit: number
   reason: string
   done?: boolean
+  /** 小精靈排好的「晚點走」「準時預約」卡：換時段重新生成任務時保留，直到搭完 */
+  pinned?: boolean
 }
 
 export type Source = 'live' | 'demo'
