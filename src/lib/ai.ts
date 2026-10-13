@@ -4,7 +4,7 @@ import { parseIntent } from './intent'
 import { TOOL_LABEL, describeTool, runTool, type Proposal, type ToolCtx, type ToolName } from './tools'
 import type { Source, Task, Weather } from './types'
 import { POIS, poiById } from './geo'
-import { FALLBACK_CHAT, FALLBACK_CHAT_DEFAULT, FALLBACK_OPS, FALLBACK_TASKS, PERSONA, SLOT_LABEL, type Slot } from '../data/demo'
+import { FALLBACK_OPS, SLOT_LABEL, fallbackChatReply, getDemoPersona, getFallbackTasks, type Slot } from '../data/demo'
 
 export type AiStatus = { state: 'idle' | 'live' | 'demo' | 'error'; detail?: string }
 type Listener = (s: AiStatus) => void
@@ -39,6 +39,7 @@ export type AiContext = {
   lucky: number
   litPct: number
   lowWindows: { district: string; hours: number[] }[]
+  demoPersonaId?: string
   tasks?: Task[]
   friendsTop?: string
 }
@@ -67,15 +68,16 @@ async function getModel(settings: Settings, opts: { json?: any; system?: string;
 function contextBlock(ctx: AiContext) {
   const hhmm = `${String(ctx.now.getHours()).padStart(2, '0')}:${String(ctx.now.getMinutes()).padStart(2, '0')}`
   const weekday = '日一二三四五六'[ctx.now.getDay()]
+  const persona = getDemoPersona(ctx.demoPersonaId)
   return JSON.stringify(
     {
       現在: `${ctx.now.getMonth() + 1}/${ctx.now.getDate()}（週${weekday}）${hhmm}，${SLOT_LABEL[ctx.slot]}`,
-      玩家: { 名字: PERSONA.name, 身分: PERSONA.role, 常用地點: [PERSONA.home.label, PERSONA.work.label], 習慣: PERSONA.habits },
+      玩家: { 名字: persona.name, 身分: persona.role, 常用地點: [persona.home.label, persona.work.label], 習慣: persona.habits },
       天氣: { 來源: ctx.weather.source === 'cwa' ? '中央氣象署' : '示範情境', 概況: ctx.weather.desc, 傍晚降雨機率: ctx.weather.eveningPop },
       需求低谷時段: ctx.lowWindows.map((w) => ({ 行政區: w.district, 平日小時: w.hours })),
       今日幸運數字: ctx.lucky,
       點亮進度: `${ctx.litPct}%`,
-      可用地點: POIS.filter((p) => p.kind !== 'home' && p.kind !== 'work').map((p) => ({ poiId: p.id, 名稱: p.name })).concat([{ poiId: 'home', 名稱: PERSONA.home.label }]),
+      可用地點: POIS.filter((p) => p.kind !== 'home' && p.kind !== 'work').map((p) => ({ poiId: p.id, 名稱: p.name })).concat([{ poiId: 'home', 名稱: persona.home.label }]),
     },
     null,
     0,
@@ -86,8 +88,8 @@ const TASK_SYSTEM = `你是 yoxi 點燈城的任務設計師，也是住在 yoxi
 城市一開始是夜色，玩家搭 yoxi 會點亮整條路線，完成任務會點亮街區（H3 六角格）。
 請依情境為玩家設計今天的 3 個情境任務，規則：
 1. 至少 1 個任務不用搭車：kind = walk 是在公司或住家附近步行就能完成；kind = scan 是在路上拍一台停妥的 yoxi 車（poiId 用 yoxi 上車點）。
-2. 傍晚降雨機率 60% 以上時，一定要有「下雨前預約 yoxi 回家」的任務（kind = ride，poiId = home）。
-3. 其他搭車任務排在「需求低谷時段」，rewardCredit 是只能在該時段折抵的乘車金（20–50 元），不在低谷的任務 rewardCredit = 0。
+2. 傍晚降雨機率 60% 以上時，一定要有「下雨前預約 yoxi 回家」的任務（kind = ride，poiId = home，文案要寫出玩家住家的地名）。
+3. 其他搭車任務排在「需求低谷時段」。不發乘車金或任何優惠券，rewardCredit 一律為 0；搭 yoxi 的獎勵是點亮路線（預約算錯峰，路線亮兩階）。
 4. poiId 只能從「可用地點」選。window 用「HH:MM–HH:MM」。
 5. 標題 14 字以內，detail 40 字以內，語氣溫暖、具體。reason 是寫給玩家看的一句話，說明為什麼現在適合做這個任務，20 字以內，要提到資料依據（空車低谷、天氣或常去地點）。
 6. greeting 是小精靈對玩家說的一句話，30 字以內。
@@ -98,10 +100,10 @@ type TaskCache = Record<string, { greeting: string; tasks: Task[] }>
 
 export async function generateTasks(settings: Settings, ctx: AiContext, opts: { force?: boolean } = {}): Promise<{ greeting: string; tasks: Task[]; source: Source; cached?: boolean }> {
   const fallback = () => {
-    const f = FALLBACK_TASKS[ctx.slot]
+    const f = getFallbackTasks(ctx.slot, ctx.demoPersonaId, ctx.now, ctx.weather.eveningPop >= 60)
     return { greeting: f.greeting, tasks: f.tasks.map((t) => ({ ...t })), source: 'demo' as Source }
   }
-  const cacheKey = `${ctx.now.toDateString()}|${ctx.slot}|${ctx.weather.eveningPop >= 60 ? 'rain' : 'dry'}`
+  const cacheKey = `${ctx.now.toDateString()}|${getDemoPersona(ctx.demoPersonaId).id}|${ctx.slot}|${ctx.weather.eveningPop >= 60 ? 'rain' : 'dry'}`
   const cache = readJSON<TaskCache>(TASK_CACHE_KEY, {})
   if (!opts.force && !settings.forceDemo && cache[cacheKey]) {
     cacheHits++
@@ -119,7 +121,7 @@ export async function generateTasks(settings: Settings, ctx: AiContext, opts: { 
               title: Schema.string(),
               detail: Schema.string(),
               kind: Schema.enumString({ enum: ['walk', 'scan', 'ride'] }),
-              poiId: Schema.enumString({ enum: POIS.map((p) => p.id) }),
+              poiId: Schema.enumString({ enum: [...POIS.filter((p) => p.kind !== 'home').map((p) => p.id), 'home'] }),
               window: Schema.string(),
               rewardCells: Schema.integer(),
               rewardCredit: Schema.integer(),
@@ -137,10 +139,11 @@ export async function generateTasks(settings: Settings, ctx: AiContext, opts: { 
       title: String(t.title || '').slice(0, 20),
       detail: String(t.detail || '').slice(0, 60),
       kind: ['walk', 'scan', 'ride'].includes(t.kind) ? t.kind : 'walk',
-      poiId: poiById(t.poiId) ? t.poiId : 'sunyatsen',
+      poiId: t.poiId === 'home' || poiById(t.poiId)?.kind === 'home' ? 'home' : poiById(t.poiId) ? t.poiId : 'sunyatsen',
       window: String(t.window || ''),
       rewardCells: Math.max(1, Math.min(20, Number(t.rewardCells) || 1)),
-      rewardCredit: Math.max(0, Math.min(80, Number(t.rewardCredit) || 0)),
+      // 不發乘車金：模型就算填了也一律歸零
+      rewardCredit: 0,
       reason: String(t.reason || '').slice(0, 30),
     }))
     if (!tasks.length) throw new Error('empty')
@@ -225,8 +228,7 @@ export async function chatWithTools(settings: Settings, ctx: AiContext, toolCtx:
       const r = runTool(intent.name, intent.args, toolCtx)
       return { text: describeTool(intent.name, r), source: 'demo', tools: [TOOL_LABEL[intent.name]], proposal: r.proposal }
     }
-    const hit = FALLBACK_CHAT.find((f) => f.match.test(message))
-    return { text: hit ? hit.reply : FALLBACK_CHAT_DEFAULT, source: 'demo', tools: [] }
+    return { text: fallbackChatReply(message, ctx.demoPersonaId), source: 'demo', tools: [] }
   }
 }
 
@@ -267,7 +269,8 @@ export async function opsPlan(settings: Settings, input: { district: string; hou
     const model = await getModel(settings, {
       json: schema,
       system: `你是 yoxi 的營運 AI。依需求預測與等車時間，設計一個「空車時段任務」把乘客導到低谷時段，並向營運人員說明理由。
-title 30 字以內（任務名稱＋乘車金時段）；detail 50 字以內（推播對象與條件）；reason 100 字以內，引用輸入的數字說明為什麼是低谷、對乘客與司機的好處；
+title 30 字以內（任務名稱＋時段）；detail 50 字以內（推播對象與條件）；reason 100 字以內，引用輸入的數字說明為什麼是低谷、對乘客與司機的好處；
+獎勵是錯峰點燈（預約算錯峰，路線亮兩階、累積錯峰之光換和泰 Points），不發乘車金或優惠券，文案不要寫折價。
 expectedRides 是預估新增的叫車數，用 附近玩家數 × 8% 估算後取整數。繁體中文。`,
       temperature: 0.6,
     })

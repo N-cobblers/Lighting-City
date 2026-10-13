@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTrip, cityDisplay, dayKey, hourKey, isOffpeak, MAX_CELLS, monthKey, parseTripInput, taipeiTime } from '../../src/offpeak.js'
+import { applyTrip, cityDisplay, dayKey, hourKey, isOffpeak, MAX_CELLS, monthKey, parseTripInput, taipeiTime, TRIP_CAP_CELLS } from '../../src/offpeak.js'
 
 const cell = (i: number) => `89${i.toString(16).padStart(13, '0')}`
 const cells = (from: number, n: number) => Array.from({ length: n }, (_, i) => cell(from + i))
@@ -52,9 +52,20 @@ describe('錯峰之光與 Points', () => {
   })
   it('每月最多 20 點，超過不再加', () => {
     const r = applyTrip({ light: 395, points: 19 }, [], cells(0, 80))
-    expect(r).toMatchObject({ light: 475, points: 20, newPoints: 1 })
-    const again = applyTrip({ light: 475, points: 20 }, [], cells(100, 80))
+    expect(r).toMatchObject({ light: 435, points: 20, newPoints: 1 })
+    const again = applyTrip({ light: 435, points: 20 }, [], cells(100, 80))
     expect(again).toMatchObject({ points: 20, newPoints: 0 })
+  })
+  it('每趟最多 2 點：一趟 167 格只算 40 格，超過的也記成今天算過', () => {
+    const r = applyTrip({ light: 0, points: 0 }, [], cells(0, 167))
+    expect(r).toMatchObject({ counted: TRIP_CAP_CELLS, capped: 127, light: 40, points: 2, newPoints: 2 })
+    expect(r.fresh).toHaveLength(167)
+    const back = applyTrip({ light: r.light, points: r.points }, r.fresh, cells(0, 167))
+    expect(back).toMatchObject({ counted: 0, capped: 0, newPoints: 0 })
+  })
+  it('累積到一半再走一趟長途，也只多換 2 點', () => {
+    const r = applyTrip({ light: 19, points: 0 }, [], cells(0, 120))
+    expect(r).toMatchObject({ counted: 40, light: 59, points: 2, newPoints: 2 })
   })
 })
 
@@ -72,6 +83,9 @@ describe('城市公開數字', () => {
 describe('行程資料檢查', () => {
   it('格式正確就通過', () => {
     expect(parseTripInput(valid)).toEqual(valid)
+  })
+  it('長途（淡水到市府）的格子數也收得下', () => {
+    expect(parseTripInput({ ...valid, cells: cells(0, 167) }).cells).toHaveLength(167)
   })
   it.each([
     ['沒有資料', null],

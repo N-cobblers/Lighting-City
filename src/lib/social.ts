@@ -2,11 +2,12 @@ import { ensureUser, getFirebase } from './firebase'
 import type { Settings } from './settings'
 import type { Player } from './types'
 
-export const BOTS = (lucky: number): Player[] => [
+/** 示範好友；目前示範人物是阿哲時，名單裡的阿哲換成小涵（三人是同事） */
+export const BOTS = (lucky: number, selfName = ''): Player[] => [
   { uid: 'bot-an', name: '小安', sum: lucky + 2, diff: 2, plateMasked: 'TDX-51**', palette: '天藍', updatedAt: Date.now() - 3600_000, bot: true },
   { uid: 'bot-zhe', name: '阿哲', sum: lucky - 3, diff: 3, plateMasked: 'TDX-30**', palette: '薄荷', updatedAt: Date.now() - 7200_000, bot: true },
   { uid: 'bot-mia', name: 'Mia', sum: lucky + 5, diff: 5, plateMasked: 'TDX-88**', palette: '橘光', updatedAt: Date.now() - 9000_000, bot: true },
-]
+].map((b) => (b.name === selfName ? { ...b, name: '小涵' } : b))
 
 export type RoomHandle = { live: boolean; uid: string | null; stop: () => void; submit: (p: Omit<Player, 'uid' | 'updatedAt'>) => Promise<boolean> }
 

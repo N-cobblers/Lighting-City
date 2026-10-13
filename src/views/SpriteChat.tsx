@@ -4,7 +4,8 @@ import { chatWithTools, type ChatTurn } from '../lib/ai'
 import type { Proposal } from '../lib/tools'
 import { forecastText, nextRideForecast, LATER_HOUR } from '../lib/forecast'
 import { CITY_DEMO } from '../lib/offpeak'
-import { slotOf } from '../data/demo'
+import { getDemoPersona, slotOf } from '../data/demo'
+import { LATER_TASK_ID, RESERVED_TASK_ID, laterHomeTask, reservedHomeTask } from '../lib/homeTask'
 import { SpriteAvatar } from './SpriteAvatar'
 import type { Source } from '../lib/types'
 
@@ -13,8 +14,6 @@ type Choice = '準時預約' | '晚點走' | '現在走'
 
 const QUICK = ['明天 8 點從公司叫車好叫嗎？', '幫我避開尖峰', '我今天還有哪些任務？', '今晚會下雨嗎？', '今天的幸運數字是？']
 const CHOICES: Choice[] = ['準時預約', '晚點走', '現在走']
-const LATER_TASK_ID = 'later-home'
-const RESERVED_TASK_ID = 'reserved-home'
 
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
@@ -29,6 +28,7 @@ export function SpriteChat() {
   // 小精靈用「排錯峰」工具提出的方案，玩家按確認才加任務卡
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const end = useRef<HTMLDivElement>(null)
+  const persona = getDemoPersona(s.settings.demoPersonaId)
   const forecast = nextRideForecast(s.now, s.homeRideDay === new Date().toDateString(), s.weather.eveningPop)
   // 錯峰點燈只給城市層級的數字（示範），放在三個選擇旁邊
   const cityLine = forecast.isToday ? `今天已有 ${CITY_DEMO.today} 人選「晚點走」` : `已有 ${CITY_DEMO.tomorrow} 人先排好${forecast.when.replace(` 18 點`, '')}晚點走`
@@ -60,18 +60,18 @@ export function SpriteChat() {
     const later = forecast.laterLead.toFixed(1)
     if (c === '現在走') {
       say(c, `好，現在幫你叫車！司機約 ${forecast.nowWait} 分鐘到，等車時我陪你。`)
-      goRide({ routeId: 'evening-home', reserved: false, waitMin: forecast.nowWait })
+      goRide({ reserved: false, waitMin: forecast.nowWait })
       return
     }
     if (c === '準時預約') {
       if (forecast.isNow) {
         const pickup = new Date(s.now.getTime() + 5 * 60000)
         say(c, `好，幫你預約 ${hhmm(pickup)} 從市府路上車點出發。準時出發，路線亮兩階！`)
-        goRide({ routeId: 'evening-home', reserved: true })
+        goRide({ reserved: true })
         return
       }
       if (forecast.isToday) {
-        s.addTask({ id: RESERVED_TASK_ID, title: '已預約 18:10 回家', detail: '18:10 從市府路上車點出發，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '18:10', rewardCells: 12, rewardCredit: 0, reason: '預約讓司機提早安排，尖峰也準時', pinned: true })
+        s.addTask(reservedHomeTask(persona.homeCard, 18))
         setFocusCard(RESERVED_TASK_ID)
         say(c, '好，幫你預約今天 18:10 從市府路上車點出發，已放進今日任務。準時出發，路線亮兩階！')
         return
@@ -81,7 +81,7 @@ export function SpriteChat() {
     }
     // 晚點走
     if (forecast.isToday) {
-      s.addTask({ id: LATER_TASK_ID, title: `${LATER_HOUR}:00 從市府回家`, detail: `${LATER_HOUR} 點後出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${LATER_HOUR}:00–${LATER_HOUR}:30`, rewardCells: 12, rewardCredit: 0, reason: `${LATER_HOUR} 點後${forecast.place}叫車到上車約 ${later} 分`, pinned: true })
+      s.addTask(laterHomeTask(persona.homeCard, s.now, LATER_HOUR, forecast.rain))
       setFocusCard(LATER_TASK_ID)
       say(c, `好，${LATER_HOUR}:00 後再走，那時叫車到上車約 ${later} 分，搭了亮兩階。已放進今日任務最後一張。`)
       return
@@ -100,8 +100,8 @@ export function SpriteChat() {
     const history = msgs.slice(1).map(({ role, text }) => ({ role, text }))
     const at = msgs.length + 1
     setMsgs((m) => [...m, { role: 'user', text: t }, { role: 'model', text: '' }])
-    const ctx = { now: s.now, slot: slotOf(s.now), weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, tasks: s.tasks }
-    const toolCtx = { now: s.now, eveningPop: s.weather.eveningPop, tasks: s.tasks, litPct: s.litPct, offpeak: s.offpeakSummary }
+    const ctx = { now: s.now, slot: slotOf(s.now), weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, demoPersonaId: persona.id, tasks: s.tasks }
+    const toolCtx = { now: s.now, eveningPop: s.weather.eveningPop, tasks: s.tasks, litPct: s.litPct, offpeak: s.offpeakSummary, home: persona.homeCard }
     const r = await chatWithTools(s.settings, ctx, toolCtx, history, t)
     setMsgs((m) => {
       const next = m.slice()

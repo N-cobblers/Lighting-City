@@ -10,7 +10,7 @@ const FN = `http://127.0.0.1:5001/${PROJECT}/asia-east1/recordTrip`
 const cell = (i: number) => `89${i.toString(16).padStart(13, '0')}`
 const cells = (from: number, n: number) => Array.from({ length: n }, (_, i) => cell(from + i))
 
-type Result = { offpeak: boolean; counted: number; newPoints: number; monthLight: number; monthPoints: number; duplicate?: boolean }
+type Result = { offpeak: boolean; counted: number; capped: number; newPoints: number; monthLight: number; monthPoints: number; duplicate?: boolean }
 type CallError = Error & { status?: string }
 
 let db: Firestore
@@ -76,12 +76,23 @@ describe('recordTrip', () => {
   it('每 20 格換 1 點，每月最多 20 點', async () => {
     const { token, uid } = await signIn()
     let last: Result | null = null
-    for (let d = 1; d <= 6; d++) {
-      last = await recordTrip(token, trip(`t-cap-${d}`, `2026-10-0${d}T09:00:00+08:00`, cells(0, 80), { reserved: true }))
+    // 每趟最多算 40 格：10 天剛好 400 格＝20 點，第 11 天不再加
+    for (let d = 1; d <= 11; d++) {
+      last = await recordTrip(token, trip(`t-cap-${d}`, `2026-10-${String(d).padStart(2, '0')}T09:00:00+08:00`, cells(0, 80), { reserved: true }))
     }
-    expect(last).toMatchObject({ monthLight: 480, monthPoints: 20, newPoints: 0 })
+    expect(last).toMatchObject({ counted: 40, capped: 40, monthLight: 440, monthPoints: 20, newPoints: 0 })
     const month = await db.doc(`users/${uid}/months/2026-10`).get()
     expect(month.get('points')).toBe(20)
+  })
+
+  it('每趟最多 2 點：一趟 167 格只換 2 點，超過的格子不留到下一趟', async () => {
+    const { token, uid } = await signIn()
+    const long = await recordTrip(token, trip('t-long', '2026-10-13T19:05:00+08:00', cells(0, 167)))
+    expect(long).toMatchObject({ offpeak: true, counted: 40, capped: 127, newPoints: 2, monthLight: 40, monthPoints: 2 })
+    const day = await db.doc(`users/${uid}/days/2026-10-13`).get()
+    expect(day.get('cells')).toHaveLength(167)
+    const back = await recordTrip(token, trip('t-long-back', '2026-10-13T21:00:00+08:00', cells(0, 167), { reserved: true }))
+    expect(back).toMatchObject({ counted: 0, capped: 0, newPoints: 0, monthLight: 40 })
   })
 
   it('城市人數不到 20 不公開，23 人顯示 20；同一人同一小時只算一人', async () => {

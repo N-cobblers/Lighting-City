@@ -4,15 +4,18 @@
  * - 預約一律算錯峰；週末只算預約。
  * - 平日在自己那區的尖峰（信義區 18 點）前後一小時出發，也就是 17、19 點，才算錯峰；18 點不算。
  * - 錯峰行程點亮的格子累積成「錯峰之光」：同一格一天只算一次，每 20 格換 1 點和泰 Points，每人每月最多 20 點。
+ * - 每趟最多 2 點：一趟最多 40 格計入；長途超過的格子照樣發光，但不累計，也不留到下一趟（記成今天算過）。
  * 時間一律換算成台北時間（UTC+8，台灣沒有日光節約時間），伺服器在哪個時區都一樣。
  */
 export const PEAK_HOUR = 18
 export const CELLS_PER_POINT = 20
 export const MONTHLY_CAP = 20
+/** 一趟最多算幾格錯峰之光（＝每趟最多 2 點） */
+export const TRIP_CAP_CELLS = 40
 /** 城市彙總：每區每小時至少這麼多人錯峰才公開，而且四捨五入到 10，無法從數字反推是誰 */
 export const CITY_MIN_RIDERS = 20
-/** 一趟行程最多帶幾格（雙北的路線取樣後通常 10–30 格） */
-export const MAX_CELLS = 80
+/** 一趟行程最多帶幾格：市區短程通常 10–30 格，淡水到市府約 24 公里、第 9 級約 90 格，留餘裕給第 10 級 */
+export const MAX_CELLS = 300
 
 export const DISTRICTS = ['中正區', '大同區', '中山區', '松山區', '大安區', '萬華區', '信義區', '士林區', '北投區', '內湖區', '南港區', '文山區'] as const
 
@@ -38,13 +41,17 @@ export function isOffpeak(t: Pick<TaipeiTime, 'dow' | 'hour'>, reserved: boolean
 
 export type MonthState = { light: number; points: number }
 
-/** 一趟錯峰行程：只算今天還沒算過的格子，每 20 格換 1 點，每月最多 20 點。 */
+/**
+ * 一趟錯峰行程：只算今天還沒算過的格子，一趟最多 40 格，每 20 格換 1 點，每月最多 20 點。
+ * fresh 是這趟今天第一次經過的格子（全部記成今天算過），counted 是真正計入錯峰之光的格數，capped 是超過每趟上限沒算到的格數。
+ */
 export function applyTrip(month: MonthState, dayCells: readonly string[], cells: readonly string[]) {
   const seen = new Set(dayCells)
   const fresh = [...new Set(cells)].filter((c) => !seen.has(c))
-  const light = month.light + fresh.length
+  const counted = Math.min(fresh.length, TRIP_CAP_CELLS)
+  const light = month.light + counted
   const points = Math.min(MONTHLY_CAP, Math.floor(light / CELLS_PER_POINT))
-  return { fresh, light, points, newPoints: Math.max(0, points - month.points) }
+  return { fresh, counted, capped: fresh.length - counted, light, points, newPoints: Math.max(0, points - month.points) }
 }
 
 /** 公開的城市數字：人數不到 20 就不顯示，否則四捨五入到 10。 */

@@ -128,7 +128,7 @@ export function OpsView() {
 
   const push = () => {
     if (!plan) return
-    const task = { id: `ops-${Date.now()}`, title: plan.title.slice(0, 18), detail: plan.detail.slice(0, 50), kind: 'ride' as const, poiId: 'spot-songyan', window: `${hour}:00–${hour + 2}:00`, rewardCells: 6, rewardCredit: 30, reason: plan.reason }
+    const task = { id: `ops-${Date.now()}`, title: plan.title.slice(0, 18), detail: plan.detail.slice(0, 50), kind: 'ride' as const, poiId: 'spot-songyan', window: `${hour}:00–${hour + 2}:00`, rewardCells: 6, rewardCredit: 0, reason: plan.reason }
     s.setTasks([task, ...s.tasks.filter((t) => !t.id.startsWith('ops-'))].slice(0, 4), s.greeting, s.tasksSource || 'demo')
     s.toast('任務已推播給附近玩家', 'lamp')
   }
@@ -199,11 +199,11 @@ export function OpsView() {
         </div>
         <p className="reason small">信義區平日等超過 10 分鐘：18 點 25%、19 點 11%（2026/2–4 競賽資料彙總）。避開尖峰一小時，等車就少很多。</p>
         <ul className="offpeak-rules small">
-          <li>獎勵：錯峰的路線亮兩階；每 20 格錯峰之光換 1 點和泰 Points，每人每月上限 20 點，由和泰集團 Points 行銷預算支應</li>
+          <li>獎勵：錯峰的路線亮兩階；每 20 格錯峰之光換 1 點和泰 Points，每趟最多 2 點、每人每月上限 20 點，由和泰集團 Points 行銷預算支應</li>
           <li>防洗：只算完成的行程，同一格一天只算一次</li>
           <li>驗證：三組對照（只有光／光＋Points／都沒有）</li>
         </ul>
-        <p className="muted tiny">試算：一趟錯峰約 12 格 ÷ 20 格／點 × NT$1 ≈ NT$0.6；派遣費 NT$266 × 10% ≈ NT$26.6。正式版用 yoxi 自己的行程紀錄判斷是否錯峰，點燈足跡仍只存在手機；原型用模擬行程。</p>
+        <p className="muted tiny">試算：一趟錯峰約 12 格 ÷ 20 格／點 × NT$1 ≈ NT$0.6，長途每趟最多 2 點（NT$2）；派遣費 NT$266 × 10% ≈ NT$26.6。正式版用 yoxi 自己的行程紀錄判斷是否錯峰，點燈足跡仍只存在手機；原型用模擬行程。</p>
       </section>
 
       <ModelCard />

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useStore, LOW_WINDOWS } from '../lib/store'
-import { AREA_CELLS, CENTER, POIS, cellAt, cellsFeatureCollection, interpolateAlong, lineFeature, neighbours, pathLengthKm, poiById, routeById, routeCells, samplePath, type LngLat, type Route } from '../lib/geo'
+import { AREA_CELLS, CENTER, POIS, cellAt, cellsFeatureCollection, interpolateAlong, lineFeature, neighbours, pathLengthKm, poiById, roadRouteTo, routeById, routeCells, samplePath, type LngLat, type Route } from '../lib/geo'
 import { generateTasks } from '../lib/ai'
-import { slotOf, SLOT_LABEL } from '../data/demo'
+import { DEMO_PERSONAS, getDemoPersona, slotOf, SLOT_LABEL, type DemoPersona } from '../data/demo'
 import type { Task, TaskKind } from '../lib/types'
 import districts from '../data/districts.json'
 import { BASEMAP, MAP_PALETTE, isLight, type Phase } from '../lib/phase'
-import { CELLS_PER_POINT, isOffpeak } from '../lib/offpeak'
+import { CELLS_PER_POINT, TRIP_CAP_CELLS, isOffpeak } from '../lib/offpeak'
 import { SpriteAvatar } from './SpriteAvatar'
 
 /** 底圖載入失敗時的離線底圖（行政區界），顏色跟著時段。 */
@@ -87,10 +87,17 @@ const KIND_LABEL: Record<TaskKind, string> = { walk: '步行', scan: '拍車', r
 // 不搭車的任務排前面，搭車（加倍）的排最後
 const KIND_ORDER: Record<TaskKind, number> = { walk: 0, scan: 1, ride: 2 }
 
-function taskRoute(t: Task): Route {
-  if (t.poiId === 'home') return routeById('evening-home')
+/** 任務卡要走的路線：回家走這個人的回家路線、去公司走上班路線；其他地點用沿路的路線（從市府路上車點出發） */
+function taskRoute(t: Task, personaId?: string): Route {
+  const persona = getDemoPersona(personaId)
+  if (t.poiId === 'home' || t.poiId === persona.home.poiId) return routeById(persona.homeCard.route)
+  const own = persona.routes[t.poiId]
+  if (own) return { ...routeById(own), name: t.title }
   if (t.poiId === 'spot-songyan' || t.poiId === 'songyan') return routeById('afternoon-songyan')
-  if (t.poiId === 'work' || t.poiId === 'spot-cityhall') return routeById('morning-work')
+  if (t.poiId === 'work' || t.poiId === 'spot-cityhall') return routeById(persona.workRoute)
+  const road = roadRouteTo(t.poiId)
+  if (road) return { ...road, name: t.title }
+  // 沒有沿路資料的地點：畫兩段直線示意，時間用時速 25 公里加 3 分鐘上車估算
   const from = poiById('spot-cityhall')!
   const to = poiById(t.poiId) || poiById('sunyatsen')!
   const path: LngLat[] = [
@@ -98,7 +105,23 @@ function taskRoute(t: Task): Route {
     [to.lng, from.lat],
     [to.lng, to.lat],
   ]
-  return { id: `dyn-${t.poiId}`, name: t.title, from: from.id, to: to.id, path, minutes: Math.round(pathLengthKm(path) * 3 + 3) }
+  return { id: `dyn-${t.poiId}`, name: t.title, from: from.id, to: to.id, path, minutes: Math.round((pathLengthKm(path) / 25) * 60 + 3) }
+}
+
+/** 這個人的足跡範圍（近 30 天的路線、家、公司），切換人物時把地圖框到這裡 */
+function footprintBounds(p: DemoPersona) {
+  const pts: LngLat[] = []
+  for (const h of p.history30d) {
+    const r = routeById(h.route)
+    if (r) pts.push(...r.path)
+  }
+  for (const id of [p.home.poiId, p.work.poiId]) {
+    const q = poiById(id)
+    if (q) pts.push([q.lng, q.lat])
+  }
+  const b = new maplibregl.LngLatBounds(pts[0], pts[0])
+  pts.forEach((x) => b.extend(x))
+  return b
 }
 
 export function MapView() {
@@ -141,7 +164,32 @@ export function MapView() {
     const sh = sheetRef.current?.getBoundingClientRect().height || 300
     return Math.min(h * 0.6, sh)
   }
+  // 框地圖時預留抽屜展開的高度：剛切換人物時任務還在生成，抽屜量起來比較矮，地圖會被框到抽屜底下
+  const fitPadding = () => {
+    const h = box.current?.clientHeight || 700
+    const sh = Math.max(sheetRef.current?.getBoundingClientRect().height || 0, 320)
+    return { top: 130, bottom: Math.min(h * 0.6, sh) + 10, left: 24, right: 24 }
+  }
   const slot = slotOf(s.now)
+  const persona = getDemoPersona(s.settings.demoPersonaId)
+  const personaRef = useRef(persona)
+  personaRef.current = persona
+
+  // 地圖框到這個人的足跡，家的標記換成這個人的；fitBounds 的 padding 不會留在地圖上（flyTo 的會）
+  const focusPersona = useCallback((map: MlMap, selectedPersona: DemoPersona, duration = 1000) => {
+    box.current?.querySelectorAll<HTMLElement>('.poi[data-poi-id]').forEach((marker) => {
+      const poi = poiById(marker.dataset.poiId || '')
+      const homeOwner = DEMO_PERSONAS.find((candidate) => candidate.home.poiId === marker.dataset.poiId)
+      const isSelectedHome = marker.dataset.poiId === selectedPersona.home.poiId
+      marker.classList.toggle('poi-home', !!homeOwner)
+      marker.classList.toggle('poi-home-selected', isSelectedHome)
+      marker.classList.toggle('poi-place', poi?.kind === 'place' && !homeOwner)
+      marker.textContent = poi?.kind === 'work' ? '公司' : homeOwner ? `${homeOwner.name}家` : ''
+      if (homeOwner) marker.title = `${homeOwner.name}的家 · ${poi?.name || ''}`
+    })
+    map.fitBounds(footprintBounds(selectedPersona), { padding: fitPadding(), duration, maxZoom: 14 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 換底圖（setStyle）後圖層會清空，style.load 時重新疊上
   const addLayers = useCallback((map: MlMap) => {
@@ -186,8 +234,7 @@ export function MapView() {
       if (!usingFallback.current) setMapNote('')
     })
     map.once('idle', () => {
-      const b = new maplibregl.LngLatBounds([121.5495, 25.0275], [121.5785, 25.0630])
-      map.fitBounds(b, { padding: { top: 70, bottom: sheetPad() + 10, left: 24, right: 24 }, duration: 0 })
+      focusPersona(map, personaRef.current, 0)
     })
     map.on('error', (e: any) => {
       // 單張圖磚載不到不算底圖失敗，只有樣式本身載不到才改用離線底圖
@@ -198,9 +245,12 @@ export function MapView() {
     // yoxi 上車點與地標
     for (const p of POIS) {
       const el = document.createElement('div')
+      const homeOwner = DEMO_PERSONAS.find((candidate) => candidate.home.poiId === p.id)
       el.className = `poi poi-${p.kind}`
+      el.dataset.poiId = p.id
       el.title = p.name
-      if (p.kind === 'home' || p.kind === 'work') el.textContent = p.kind === 'home' ? '家' : '公司'
+      if (p.kind === 'work') el.textContent = '公司'
+      else if (homeOwner) el.textContent = `${homeOwner.name}家`
       new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map)
     }
     const car = document.createElement('div')
@@ -212,7 +262,7 @@ export function MapView() {
       map.remove()
       mapRef.current = null
     }
-  }, [addLayers])
+  }, [addLayers, focusPersona])
 
   // Keep the lit layer in sync with the footprint.
   useEffect(() => {
@@ -313,7 +363,7 @@ export function MapView() {
   // 換時段時先用當天的任務快取；按「重新生成」才強制再問一次 Gemini
   const regenerate = useCallback(async (force = false) => {
     setGenBusy(true)
-    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS }, { force })
+    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, demoPersonaId: s.settings.demoPersonaId }, { force })
     s.setTasks(r.tasks, r.greeting, r.source)
     setGenBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -321,12 +371,26 @@ export function MapView() {
 
   const lastSlot = useRef<string>('')
   useEffect(() => {
-    const key = `${slot}-${s.weather.eveningPop}`
+    const key = `${slot}-${s.weather.eveningPop}-${s.settings.demoPersonaId}`
     if (lastSlot.current === key) return
     lastSlot.current = key
     regenerate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slot, s.weather.eveningPop])
+  }, [slot, s.weather.eveningPop, s.settings.demoPersonaId])
+
+  // 切換人物時把地圖移到那個人的足跡（第一次載入由 idle 處理）
+  const shownPersona = useRef(persona.id)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || shownPersona.current === persona.id) return
+    shownPersona.current = persona.id
+    // 上一個人最後一趟的軌跡不屬於這個人，清掉
+    trailRef.current = []
+    ;(map.getSource('trail') as maplibregl.GeoJSONSource | undefined)?.setData(lineFeature([]) as any)
+    setSheetOpen(true)
+    focusPersona(map, persona)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persona.id, focusPersona])
 
   // 任務輪播：一次一張卡，左右滑
   const cards = useMemo(
@@ -459,7 +523,7 @@ export function MapView() {
       s.lightCells(ring, 1)
       setRiding(null)
       if (task) s.completeTask(task.id)
-      if (route.id === 'evening-home') s.markHomeRide()
+      if (poiById(route.to)?.kind === 'home') s.markHomeRide()
       glowAt(route.path[route.path.length - 1])
       const head = offpeak ? '錯峰點燈，路線亮兩階！' : '搭 yoxi 抵達！'
       showPop(
@@ -471,7 +535,15 @@ export function MapView() {
         const r = s.recordOffpeak(cells.map((c) => c.cell))
         if (r.newPoints > 0)
           setTimeout(
-            () => showPop(r.newPoints === 1 ? `錯峰之光滿 ${CELLS_PER_POINT} 格，換到 1 點和泰 Points！` : `錯峰之光累積 ${r.light} 格，換到 ${r.newPoints} 點和泰 Points！`, 5200),
+            () =>
+              showPop(
+                r.capped > 0
+                  ? `這趟換到 ${r.newPoints} 點和泰 Points！每趟最多 ${TRIP_CAP_CELLS / CELLS_PER_POINT} 點，其他格子照樣發光`
+                  : r.newPoints === 1
+                    ? `錯峰之光滿 ${CELLS_PER_POINT} 格，換到 1 點和泰 Points！`
+                    : `錯峰之光累積 ${r.light} 格，換到 ${r.newPoints} 點和泰 Points！`,
+                5200,
+              ),
             3700,
           )
       }
@@ -503,7 +575,9 @@ export function MapView() {
     if (!r) return
     s.requestRide(null)
     const t = r.taskId ? s.tasks.find((x) => x.id === r.taskId) : undefined
-    const route = t ? taskRoute(t) : routeById(r.routeId || 'evening-home') || routeById('evening-home')
+    // 沒指定路線就是回家：走目前這個人的回家路線
+    const home = routeById(persona.homeCard.route)
+    const route = t ? taskRoute(t, persona.id) : (r.routeId && routeById(r.routeId)) || home
     if (r.waitMin) waitThenRide(route, r.waitMin, !!r.reserved)
     else ride(route, t, r.reserved ?? !!t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -635,12 +709,11 @@ export function MapView() {
                           <div className="task-foot">
                             <span className="reward">
                               點亮 {t.rewardCells} 格{t.kind === 'ride' ? '・搭了亮兩階' : ''}
-                              {t.rewardCredit > 0 ? `・乘車金 ${t.rewardCredit} 元` : ''}
                             </span>
                             {t.done ? (
                               <span className="done-label">✓ 已完成</span>
                             ) : t.kind === 'ride' ? (
-                              <button className="btn-lamp" disabled={busy} onClick={() => ride(taskRoute(t), t, true)}>
+                              <button className="btn-lamp" disabled={busy} onClick={() => ride(taskRoute(t, persona.id), t, true)}>
                                 預約 yoxi
                               </button>
                             ) : t.kind === 'scan' ? (

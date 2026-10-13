@@ -193,16 +193,22 @@ button { font: inherit; color: inherit; }
 .phase-veil.on { opacity: 0.9; }
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px; background: var(--topbar-bg); border-bottom: 1px solid var(--topbar-line); z-index: 5; }
 .brand { display: flex; align-items: center; gap: 8px; }
-.brand strong { font-family: var(--round); font-size: 18px; letter-spacing: 0.5px; color: var(--title); }
+.brand strong { font-family: var(--round); font-size: 18px; letter-spacing: 0.5px; color: var(--title); white-space: nowrap; }
 .brand-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
-.brand-text .proto { margin-top: 3px; font-size: 10px; padding: 1px 6px; }
+.brand-text .proto { font-size: 10px; padding: 1px 6px; white-space: nowrap; }
+.brand-sub { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
 .logo-dot { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff6d0, var(--lamp) 55%, var(--amber)); box-shadow: 0 0 12px rgba(255, 201, 74, 0.8); }
 .proto { font-size: 11px; color: var(--ink); background: var(--lamp-2); padding: 2px 7px; border-radius: 999px; font-weight: 700; }
 .top-right { display: flex; align-items: center; gap: 8px; }
-.clock { display: inline-flex; align-items: center; gap: 5px; font-family: var(--round); font-size: 14px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.clock { display: inline-flex; align-items: center; gap: 5px; font-family: var(--round); font-size: 14px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
 .clock .sky { width: 15px; height: 15px; flex: none; }
 .clock.sim { border-color: var(--accent-line); color: var(--accent-text); }
 .ops-pill { font-size: 12.5px; font-weight: 700; color: var(--ops-fg); background: var(--ops-bg); border: 1px solid var(--ops-line); border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+/* 示範人物：品牌第二行只放目前的名字，點開才列出三個人 */
+.persona-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px; line-height: 1.35; font-weight: 700; color: var(--text); background: var(--surface); border: 1px solid var(--accent-line); border-radius: 999px; padding: 0 6px; cursor: pointer; white-space: nowrap; }
+.persona-chip i { font-style: normal; font-size: 9px; opacity: 0.75; }
+.persona-menu { left: 10px; right: auto; }
+.persona-menu .script-step.on { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .icon-btn { background: none; border: 0; padding: 6px; border-radius: 10px; cursor: pointer; color: var(--muted); }
 .icon-btn:focus-visible, button:focus-visible, .input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ai-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
@@ -270,7 +276,10 @@ textarea.input { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .poi { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--bg); }
 .poi-yoxi { background: var(--lamp); box-shadow: 0 0 10px rgba(255, 201, 74, 0.9); }
 .poi-place { background: var(--poi-place); opacity: 0.85; width: 9px; height: 9px; }
-.poi-home, .poi-work { width: auto; height: auto; border-radius: 8px; padding: 2px 6px; font-size: 11px; font-weight: 700; color: var(--ink); background: var(--label-bg); border: 0; box-shadow: 0 1px 4px rgba(20, 33, 61, 0.25); }
+.poi-home, .poi-work { width: auto; height: auto; border-radius: 8px; padding: 2px 6px; font-size: 11px; line-height: 1.35; font-weight: 700; color: var(--ink); background: var(--label-bg); border: 0; box-shadow: 0 1px 4px rgba(20, 33, 61, 0.25); white-space: nowrap; }
+/* 其他示範玩家的家淡一點；目前這個人的家用車燈色 */
+.poi-home { opacity: 0.8; }
+.poi-home.poi-home-selected { opacity: 1; background: var(--lamp); box-shadow: 0 0 14px 3px rgba(255, 201, 74, 0.7); z-index: 2; }
 .car { position: relative; width: 22px; height: 22px; }
 .car .body { position: absolute; inset: 4px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff6d0, var(--lamp) 60%, var(--amber)); box-shadow: 0 0 16px 6px rgba(255, 201, 74, 0.75); }
 .car .beam { position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 224, 138, 0.35), rgba(255, 224, 138, 0) 70%); }

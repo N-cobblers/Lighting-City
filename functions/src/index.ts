@@ -8,8 +8,10 @@ const db = getFirestore()
 
 export type RecordTripResult = {
   offpeak: boolean
-  /** 這趟新算進錯峰之光的格子數（同一格一天只算一次） */
+  /** 這趟新算進錯峰之光的格子數（同一格一天只算一次，一趟最多 40 格） */
   counted: number
+  /** 這趟超過每趟上限、沒有算進錯峰之光的格子數（照樣發光，不留到下一趟） */
+  capped: number
   /** 這趟新換到的和泰 Points */
   newPoints: number
   monthLight: number
@@ -27,7 +29,7 @@ export type RecordTripResult = {
  * Firestore 結構：
  * - users/{uid}/offpeakTrips/{tripId}：每趟一筆，行程編號重送只算一次
  * - users/{uid}/days/{yyyy-mm-dd}：當天算過的格子（同一格一天一次）與算過的城市時段（同一人同一時段只算一人）
- * - users/{uid}/months/{yyyy-mm}：本月錯峰之光與 Points（上限 20 點）
+ * - users/{uid}/months/{yyyy-mm}：本月錯峰之光與 Points（每趟最多 2 點、每月上限 20 點）
  * - cityCounts/{行政區}_{yyyymmddHH}：錯峰人數原始值，只有伺服器能讀寫
  * - cityPublic/{行政區}_{yyyymmddHH}：公開值，不到 20 人為 null，否則四捨五入到 10
  */
@@ -60,7 +62,7 @@ export const recordTrip = onCall({ region: 'asia-east1' }, async (req): Promise<
     const month = { light: Number(monthSnap.get('light') ?? 0), points: Number(monthSnap.get('points') ?? 0) }
 
     if (!offpeak) {
-      const result: RecordTripResult = { offpeak: false, counted: 0, newPoints: 0, monthLight: month.light, monthPoints: month.points }
+      const result: RecordTripResult = { offpeak: false, counted: 0, capped: 0, newPoints: 0, monthLight: month.light, monthPoints: month.points }
       tx.create(tripRef, { ...trip, cells: [], result, createdAt: FieldValue.serverTimestamp() })
       return result
     }
@@ -70,7 +72,7 @@ export const recordTrip = onCall({ region: 'asia-east1' }, async (req): Promise<
     const dayCells: string[] = daySnap.get('cells') ?? []
     const cityHours: string[] = daySnap.get('cityHours') ?? []
     const next = applyTrip(month, dayCells, input.cells)
-    const result: RecordTripResult = { offpeak: true, counted: next.fresh.length, newPoints: next.newPoints, monthLight: next.light, monthPoints: next.points }
+    const result: RecordTripResult = { offpeak: true, counted: next.counted, capped: next.capped, newPoints: next.newPoints, monthLight: next.light, monthPoints: next.points }
     const firstInHour = !cityHours.includes(cityId)
 
     tx.set(dayRef, { cells: [...dayCells, ...next.fresh], cityHours: firstInHour ? [...cityHours, cityId] : cityHours, updatedAt: FieldValue.serverTimestamp() })

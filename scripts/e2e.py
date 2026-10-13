@@ -243,6 +243,29 @@ def main():
         page.wait_for_timeout(13000)
         shot(page, '11_home')
 
+        # 三位示範人物：切到阿哲，地圖換成他的足跡、有「19:00 從市府回板橋」的卡；切回小涵，點亮比例還在
+        tab('城市')
+        page.wait_for_timeout(600)
+        han_lit = page.locator('.chip-lamp').first.inner_text()
+        page.locator('.persona-chip').click()
+        page.wait_for_timeout(400)
+        page.get_by_role('menuitemradio', name='阿哲').click()
+        page.wait_for_timeout(3500)
+        if page.locator('.sheet-summary').count():
+            page.locator('.sheet-summary').click()
+            page.wait_for_timeout(600)
+        shot(page, '12_persona_azhe')
+        if page.locator('.task', has_text='19:00 從市府回板橋').count() == 0:
+            failures.append('切到阿哲後沒有「19:00 從市府回板橋」的卡')
+        if '阿哲' not in page.locator('.persona-chip').inner_text():
+            failures.append('切到阿哲後頂欄的名字沒有換')
+        page.locator('.persona-chip').click()
+        page.wait_for_timeout(400)
+        page.get_by_role('menuitemradio', name='小涵').click()
+        page.wait_for_timeout(2500)
+        if page.locator('.chip-lamp').first.inner_text() != han_lit:
+            failures.append(f'切回小涵後點亮比例變了（{han_lit} → {page.locator(".chip-lamp").first.inner_text()}）')
+
         page.get_by_role('button', name='設定').click()
         page.wait_for_timeout(500)
         shot(page, '09_settings')

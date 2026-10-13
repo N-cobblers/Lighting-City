@@ -1,6 +1,7 @@
 import type { Task } from './types'
 import { CELLS_PER_POINT } from './offpeak'
 import { HOME_HOUR, LATER_HOUR, PICKUP_AREA, dowOf, waitAt } from './forecast'
+import { DEFAULT_HOME, laterHomeTask, reservedHomeTask, type Home } from './homeTask'
 
 /**
  * 小精靈可以用的工具（Gemini function calling）。Gemini 連不上時，intent.ts 用關鍵字判斷意圖，呼叫同一組工具。
@@ -9,7 +10,8 @@ import { HOME_HOUR, LATER_HOUR, PICKUP_AREA, dowOf, waitAt } from './forecast'
 export type ToolName = 'get_forecast' | 'get_progress' | 'propose_offpeak'
 export const TOOL_LABEL: Record<ToolName, string> = { get_forecast: '查預報', get_progress: '查進度', propose_offpeak: '排錯峰' }
 
-export type ToolCtx = { now: Date; eveningPop: number; tasks: Task[]; litPct: number; offpeak: { light: number; points: number } }
+/** home：目前玩家的家（回家卡上的「回 X」與路線），沒給就是小涵的家 */
+export type ToolCtx = { now: Date; eveningPop: number; tasks: Task[]; litPct: number; offpeak: { light: number; points: number }; home?: Home }
 export type Proposal = { summary: string; task: Task }
 export type ToolResult = { response: Record<string, unknown>; proposal?: Proposal }
 
@@ -76,12 +78,12 @@ function getProgress(_args: Record<string, unknown>, ctx: ToolCtx): ToolResult {
 function proposeOffpeak(args: Record<string, unknown>, ctx: ToolCtx): ToolResult {
   const reserve = args.mode === 'reserve'
   const hour = clampHour(args.hour, reserve ? HOME_HOUR : LATER_HOUR)
-  const w = waitAt(PICKUP_AREA, dowOf(ctx.now), hour, ctx.eveningPop >= 60 && hour >= 17)
+  const rain = ctx.eveningPop >= 60 && hour >= 17
+  const w = waitAt(PICKUP_AREA, dowOf(ctx.now), hour, rain)
   const p50 = w ? w.p50.toFixed(1) : '?'
-  const task: Task = reserve
-    ? { id: 'reserved-home', title: `已預約 ${hour}:10 回家`, detail: `${hour}:10 從市府路上車點出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${hour}:10`, rewardCells: 12, rewardCredit: 0, reason: '預約讓司機提早安排，尖峰也準時', pinned: true }
-    : { id: 'later-home', title: `${hour}:00 從市府回家`, detail: `${hour} 點後出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${hour}:00–${hour}:30`, rewardCells: 12, rewardCredit: 0, reason: `${hour} 點信義區叫車到上車約 ${p50} 分`, pinned: true }
-  const summary = reserve ? `預約 ${hour}:10 從市府路上車點回家，路線亮兩階` : `${hour}:00 後再從市府回家，那時叫車到上車約 ${p50} 分，路線亮兩階`
+  const home = ctx.home ?? DEFAULT_HOME
+  const task: Task = reserve ? reservedHomeTask(home, hour) : laterHomeTask(home, ctx.now, hour, rain)
+  const summary = reserve ? `預約 ${hour}:10 從市府路上車點回${home.word}，路線亮兩階` : `${hour}:00 後再從市府回${home.word}，那時叫車到上車約 ${p50} 分，路線亮兩階`
   return { response: { 提案: summary, 狀態: '等玩家按確認，還沒加入任務' }, proposal: { summary, task } }
 }
 

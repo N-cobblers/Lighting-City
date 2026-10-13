@@ -3,6 +3,7 @@ import { useStore, type Tab } from './lib/store'
 import { onAiStatus, type AiStatus } from './lib/ai'
 import { nextRideForecast } from './lib/forecast'
 import type { Phase } from './lib/phase'
+import { DEMO_PERSONAS, getDemoPersona } from './data/demo'
 import { MapView } from './views/MapView'
 import { SpriteChat } from './views/SpriteChat'
 import { FriendsView } from './views/FriendsView'
@@ -65,6 +66,7 @@ export default function App() {
   const [ai, setAi] = useState<AiStatus>({ state: 'idle' })
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scriptOpen, setScriptOpen] = useState(false)
+  const [personaOpen, setPersonaOpen] = useState(false)
   const [opsOpen, setOpsOpen] = useState(false)
   const [shownPhase, setShownPhase] = useState<Phase>(s.phase)
   const [veil, setVeil] = useState({ on: false, color: SKY[s.phase] })
@@ -99,6 +101,7 @@ export default function App() {
   const clock = `${String(s.now.getHours()).padStart(2, '0')}:${String(s.now.getMinutes()).padStart(2, '0')}`
   const forecastUnread = nextRideForecast(s.now, s.homeRideDay === new Date().toDateString()).key !== s.forecastSeenKey && s.tab !== 'sprite'
   const aiLabel = ai.state === 'live' ? 'Gemini 連線中' : ai.state === 'error' ? 'Gemini 未連線，使用示範資料' : ai.state === 'demo' ? '示範模式' : 'AI 準備中'
+  const persona = getDemoPersona(s.settings.demoPersonaId)
 
   return (
     <div className="app">
@@ -107,14 +110,38 @@ export default function App() {
           <span className="logo-dot" />
           <div className="brand-text">
             <strong>yoxi 點燈城</strong>
-            <span className="proto">黑客松原型</span>
+            <span className="brand-sub">
+              <span className="proto">黑客松原型</span>
+              {/* 示範人物放在品牌第二行，頂欄右邊留給時鐘、營運與設定 */}
+              <button
+                className="persona-chip"
+                onClick={() => {
+                  setPersonaOpen((o) => !o)
+                  setScriptOpen(false)
+                }}
+                aria-expanded={personaOpen}
+                aria-label={`示範人物：${persona.name}（${persona.role}），點一下切換`}
+              >
+                {persona.name}
+                <i aria-hidden="true">▾</i>
+              </button>
+            </span>
           </div>
         </div>
         <div className="top-right">
-          <button className={`clock ${s.clockIsSim ? 'sim' : ''}`} onClick={() => setScriptOpen((o) => !o)} aria-expanded={scriptOpen} aria-label="一天劇本">
+          <button
+            className={`clock ${s.clockIsSim ? 'sim' : ''}`}
+            onClick={() => {
+              setScriptOpen((o) => !o)
+              setPersonaOpen(false)
+            }}
+            aria-expanded={scriptOpen}
+            aria-label="一天劇本"
+          >
             <SkyIcon phase={shownPhase} />
             {clock}
-            {s.clockIsSim ? '・劇本' : ''}
+            {/* 劇本時間用車燈色外框表示；頂欄放了示範人物後，字就不另外寫出來 */}
+            {s.clockIsSim && <span className="sr-only">（劇本時間）</span>}
           </button>
           <span className={`ai-dot ai-${ai.state}`} title={ai.detail || aiLabel} aria-label={aiLabel} />
           <button className="ops-pill" onClick={() => setOpsOpen(true)} aria-label="營運">
@@ -125,6 +152,37 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {personaOpen && (
+        <div className="script persona-menu" role="menu" aria-label="示範人物">
+          <strong>示範人物（虛構）</strong>
+          {DEMO_PERSONAS.map((p) => (
+            <button
+              key={p.id}
+              role="menuitemradio"
+              aria-checked={p.id === persona.id}
+              className={`script-step ${p.id === persona.id ? 'on' : ''}`}
+              onClick={() => {
+                if (p.id !== persona.id) {
+                  s.updateSettings({ demoPersonaId: p.id })
+                  s.toast(`換成${p.name}・${p.role}`)
+                }
+                setPersonaOpen(false)
+              }}
+            >
+              <span className="n">{p.name.slice(-1)}</span>
+              <span>
+                <b>
+                  {p.name}・{p.role}
+                </b>
+                <em>
+                  住{p.homePlace}，在市府附近上班
+                </em>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {scriptOpen && (
         <div className="script" role="menu" aria-label="一天劇本">

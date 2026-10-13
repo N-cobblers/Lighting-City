@@ -2,8 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { cellToChildren, getResolution } from 'h3-js'
 import { loadSettings, readJSON, saveSettings, writeJSON, type Settings } from './settings'
 import type { Collected, Source, Task, Weather } from './types'
-import { AREA_SET, RES, cellAt, poiById, routeById, routeCells } from './geo'
-import { PERSONA, slotOf } from '../data/demo'
+import { RES, cellAt, cellsInBox, poiById, routeById, routeCells } from './geo'
+import { PERSONA, getDemoPersona, slotOf, type DemoPersona } from '../data/demo'
 import { luckyNumber } from './lucky'
 import { fetchCwa, rainScenario } from './weather'
 import { phaseOf, type Phase } from './phase'
@@ -24,6 +24,8 @@ const FORECAST_SEEN_KEY = 'yoxi-lighting-city:forecast-seen:v1'
 const HOME_RIDE_KEY = 'yoxi-lighting-city:home-ride:v1'
 const OFFPEAK_KEY = 'yoxi-lighting-city:offpeak:v1'
 const DAY_MS = 24 * 60 * 60 * 1000
+/** 每位示範玩家的足跡、圖鑑、錯峰點燈分開存；小涵沿用原本的 key，舊資料不會不見 */
+const keyFor = (base: string, personaId: string) => (personaId === PERSONA.id ? base : `${base}:${personaId}`)
 const GLOW_FADE_DAYS = 7
 
 type VisitHistory = Record<string, number[]>
@@ -37,38 +39,41 @@ function expandToCurrentResolution<T>(cells: Record<string, T>): Record<string, 
   return expanded
 }
 
-function loadBaseLit(): Record<string, number> {
-  const current = readJSON<Record<string, number> | null>(LIT_KEY, null)
+function loadBaseLit(persona: DemoPersona = PERSONA): Record<string, number> {
+  const current = readJSON<Record<string, number> | null>(keyFor(LIT_KEY, persona.id), null)
   if (current && typeof current === 'object') return current
+  if (persona.id !== PERSONA.id) return initialBaseLit(persona)
   for (const key of LEGACY_LIT_KEYS) {
     const legacy = readJSON<Record<string, number> | null>(key, null)
     if (legacy && typeof legacy === 'object') return expandToCurrentResolution(legacy)
   }
-  return initialBaseLit()
+  return initialBaseLit(persona)
 }
 
-function initialBaseLit(): Record<string, number> {
+function initialBaseLit(persona: DemoPersona = PERSONA): Record<string, number> {
   const lit: Record<string, number> = {}
-  for (const id of PERSONA.walkedPois) {
+  for (const id of persona.walkedPois) {
     const p = poiById(id)
     if (p) lit[cellAt(p.lng, p.lat)] = 2
   }
   return lit
 }
 
-function initialVisitHistory(now = Date.now()): VisitHistory {
+function initialVisitHistory(now = Date.now(), persona: DemoPersona = PERSONA): VisitHistory {
   const visits: VisitHistory = {}
-  for (const h of PERSONA.history30d) {
+  for (const h of persona.history30d) {
     const visitedAt = now - (30 - h.day) * DAY_MS
-    for (const { cell } of routeCells(routeById(h.route).path)) {
+    const route = routeById(h.route)
+    if (!route) continue
+    for (const { cell } of routeCells(route.path)) {
       visits[cell] = [...(visits[cell] || []), visitedAt].sort((a, b) => a - b).slice(-3)
     }
   }
   return visits
 }
 
-function loadVisitHistory(): VisitHistory {
-  const stored = readJSON<VisitHistory | null>(VISIT_KEY, null)
+function loadVisitHistory(personaId: string = PERSONA.id): VisitHistory {
+  const stored = readJSON<VisitHistory | null>(keyFor(VISIT_KEY, personaId), null)
   if (stored && typeof stored === 'object') {
     return expandToCurrentResolution(Object.fromEntries(
       Object.entries(stored)
@@ -76,6 +81,7 @@ function loadVisitHistory(): VisitHistory {
         .map(([cell, times]) => [cell, times.filter((time) => Number.isFinite(time)).sort((a, b) => a - b).slice(-3)]),
     ))
   }
+  if (personaId !== PERSONA.id) return initialVisitHistory(Date.now(), getDemoPersona(personaId))
 
   for (const key of LEGACY_VISIT_KEYS) {
     const legacyVisits = readJSON<VisitHistory | null>(key, null)
@@ -96,7 +102,7 @@ function loadVisitHistory(): VisitHistory {
     )
     return expandToCurrentResolution(visits)
   }
-  return initialVisitHistory()
+  return initialVisitHistory(Date.now(), getDemoPersona(personaId))
 }
 
 function glowLevel(times: number[], now: number) {
@@ -150,8 +156,8 @@ type Store = {
   markHomeRide: () => void
   forecastSeenKey: string
   markForecastSeen: (key: string) => void
-  /** 錯峰點燈：記一趟錯峰行程經過的格子，回傳這次算到幾格、換到幾點和泰 Points */
-  recordOffpeak: (cells: string[]) => { counted: number; newPoints: number; light: number }
+  /** 錯峰點燈：記一趟錯峰行程經過的格子，回傳這次算到幾格、因每趟上限沒算到幾格、換到幾點和泰 Points */
+  recordOffpeak: (cells: string[]) => { counted: number; capped: number; newPoints: number; light: number }
   /** 3 天內錯峰點亮、地圖上要閃爍的格子 */
   shimmer: string[]
   /** 本月錯峰之光與和泰 Points（給小精靈的「查進度」工具） */
@@ -162,26 +168,33 @@ const Ctx = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const personaId = getDemoPersona(settings.demoPersonaId).id
   const [simClock, setSimClock] = useState<{ h: number; m: number } | null>(null)
   const [tick, setTick] = useState(0)
   const [weather, setWeather] = useState<Weather>(() => rainScenario(new Date()))
-  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => loadBaseLit())
-  const [visits, setVisits] = useState<VisitHistory>(() => loadVisitHistory())
+  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => loadBaseLit(getDemoPersona(personaId)))
+  const [visits, setVisits] = useState<VisitHistory>(() => loadVisitHistory(personaId))
   const [tasks, setTaskList] = useState<Task[]>([])
   const [greeting, setGreeting] = useState('')
   const [tasksSource, setTasksSource] = useState<Source | null>(null)
-  const [collected, setCollected] = useState<Collected[]>(() => readJSON(COL_KEY, [] as Collected[]))
+  const [collected, setCollected] = useState<Collected[]>(() => readJSON(keyFor(COL_KEY, personaId), [] as Collected[]))
   const [tab, setTab] = useState<Tab>('map')
   const [toasts, setToasts] = useState<Toast[]>([])
   const [pendingRide, setPendingRide] = useState<RideRequest | null>(null)
   const [focusTask, setFocusTask] = useState<string | null>(null)
-  const [homeRideDay, setHomeRideDay] = useState(() => readJSON(HOME_RIDE_KEY, ''))
+  const [homeRideDay, setHomeRideDay] = useState(() => readJSON(keyFor(HOME_RIDE_KEY, personaId), ''))
   const [forecastSeenKey, setForecastSeenKey] = useState(() => readJSON(FORECAST_SEEN_KEY, ''))
-  const [offpeak, setOffpeak] = useState<OffpeakState>(() => sanitizeOffpeak(readJSON(OFFPEAK_KEY, null)))
+  const [offpeak, setOffpeak] = useState<OffpeakState>(() => sanitizeOffpeak(readJSON(keyFor(OFFPEAK_KEY, personaId), null)))
   const offpeakRef = useRef(offpeak)
   const toastId = useRef(0)
   const baseLitRef = useRef(baseLit)
   const visitsRef = useRef(visits)
+  const tasksRef = useRef(tasks)
+  tasksRef.current = tasks
+  // 切換示範玩家時，把這個人還沒搭的「晚點走」等卡先收起來，切回來時還在（早上決定、傍晚收成）
+  const pinnedByPersona = useRef<Record<string, Task[]>>({})
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 30000)
@@ -203,12 +216,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const litRef = useRef(lit)
   litRef.current = lit
 
-  useEffect(() => writeJSON(LIT_KEY, baseLit), [baseLit])
-  useEffect(() => writeJSON(VISIT_KEY, visits), [visits])
-  useEffect(() => writeJSON(COL_KEY, collected), [collected])
+  // 切換玩家時，新玩家的資料和 personaId 在同一次更新裡換掉，所以一定寫回那個人自己的 key
+  useEffect(() => writeJSON(keyFor(LIT_KEY, personaId), baseLit), [baseLit, personaId])
+  useEffect(() => writeJSON(keyFor(VISIT_KEY, personaId), visits), [visits, personaId])
+  useEffect(() => writeJSON(keyFor(COL_KEY, personaId), collected), [collected, personaId])
   useEffect(() => writeJSON(FORECAST_SEEN_KEY, forecastSeenKey), [forecastSeenKey])
-  useEffect(() => writeJSON(HOME_RIDE_KEY, homeRideDay), [homeRideDay])
-  useEffect(() => writeJSON(OFFPEAK_KEY, offpeak), [offpeak])
+  useEffect(() => writeJSON(keyFor(HOME_RIDE_KEY, personaId), homeRideDay), [homeRideDay, personaId])
+  useEffect(() => writeJSON(keyFor(OFFPEAK_KEY, personaId), offpeak), [offpeak, personaId])
 
   useEffect(() => {
     let cancelled = false
@@ -228,13 +242,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [settings.weatherMode, settings.cwaKey])
 
-  const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setSettings((s) => {
-      const next = { ...s, ...patch }
-      saveSettings(next)
-      return next
-    })
+  /** 換示範玩家：每個人的足跡、圖鑑、錯峰點燈、還沒搭的回家卡各自保留，切回來接著用 */
+  const switchPersona = useCallback((from: string, to: string) => {
+    pinnedByPersona.current[from] = tasksRef.current.filter((t) => t.pinned && !t.done)
+    const persona = getDemoPersona(to)
+    const nextBase = loadBaseLit(persona)
+    const nextVisits = loadVisitHistory(persona.id)
+    baseLitRef.current = nextBase
+    visitsRef.current = nextVisits
+    setBaseLit(nextBase)
+    setVisits(nextVisits)
+    setCollected(readJSON(keyFor(COL_KEY, persona.id), [] as Collected[]))
+    offpeakRef.current = sanitizeOffpeak(readJSON(keyFor(OFFPEAK_KEY, persona.id), null))
+    setOffpeak(offpeakRef.current)
+    setHomeRideDay(readJSON(keyFor(HOME_RIDE_KEY, persona.id), ''))
+    setTaskList(pinnedByPersona.current[persona.id] || [])
+    setGreeting('')
+    setTasksSource(null)
+    setFocusTask(null)
   }, [])
+
+  const updateSettings = useCallback(
+    (patch: Partial<Settings>) => {
+      const prev = settingsRef.current
+      const next = { ...prev, ...patch }
+      settingsRef.current = next
+      saveSettings(next)
+      setSettings(next)
+      const from = getDemoPersona(prev.demoPersonaId).id
+      const to = getDemoPersona(next.demoPersonaId).id
+      if (from !== to) switchPersona(from, to)
+    },
+    [switchPersona],
+  )
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'plain') => {
     const id = ++toastId.current
@@ -274,16 +314,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const r = applyOffpeak(offpeakRef.current, cells)
     offpeakRef.current = r.next
     setOffpeak(r.next)
-    return { counted: r.counted, newPoints: r.newPoints, light: r.next.light }
+    return { counted: r.counted, capped: r.capped, newPoints: r.newPoints, light: r.next.light }
   }, [])
 
   const shimmer = useMemo(() => Object.keys(liveShimmer(offpeak.shimmer, Date.now())), [offpeak, now])
 
+  // 「點亮 X%」以這個人的生活圈為分母：地圖範圍是整個雙北，用全部格子當分母幾乎都是 0%
+  const region = useMemo(() => new Set(cellsInBox(getDemoPersona(personaId).region)), [personaId])
   const litPct = useMemo(() => {
     let n = 0
-    for (const c of Object.keys(lit)) if (AREA_SET.has(c)) n++
-    return Math.round((n / AREA_SET.size) * 100)
-  }, [lit])
+    for (const c of Object.keys(lit)) if (region.has(c)) n++
+    return Math.round((n / region.size) * 100)
+  }, [lit, region])
 
   const value: Store = {
     settings,
@@ -300,8 +342,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     lightCells,
     recordRideCells,
     resetLit: () => {
-      const nextBase = initialBaseLit()
-      const nextVisits = initialVisitHistory()
+      const persona = getDemoPersona(settings.demoPersonaId)
+      const nextBase = initialBaseLit(persona)
+      const nextVisits = initialVisitHistory(Date.now(), persona)
       baseLitRef.current = nextBase
       visitsRef.current = nextVisits
       setBaseLit(nextBase)
