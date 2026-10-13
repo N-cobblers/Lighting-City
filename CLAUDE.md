@@ -73,6 +73,9 @@ python scripts/e2e.py                 # 需先 build + preview；截圖在 scrip
 python scripts/ocr_check.py           # 用 onnxruntime 檢查車牌辨識模型
 python scripts/export_glb.py          # 需先 npm run dev；重新匯出 AR 用的小精靈 GLB
 
+# 3 分鐘影片：自動錄 App、開場結尾地圖、旁白（edge-tts）、合成（ffmpeg），步驟見 scripts/video/README.md
+python scripts/video/compose.py all
+
 # 部署（需先建立 .firebaserc）
 npx firebase-tools deploy --only hosting,firestore:rules
 ```
@@ -116,6 +119,7 @@ functions/              錯峰點燈後端：recordTrip（錯峰判斷、Points 
 .github/workflows/ci.yml  每個 PR 自動跑：App 建置與單元測試、Cloud Functions 模擬器測試、e2e
 data-pipeline/          yoxi 資料前處理、分析、預測（含 14 號 LightGBM 等車模型）、匯出（Python）與 BigQuery ML SQL
 docs/                   提案決策、研究報告、資料分析報告（data-analysis-report.md）、影片腳本、簡報原始檔、示範車牌
+scripts/video/          3 分鐘方案說明影片的自動錄製與合成（旁白 script_data.py、分鏡 shots.py；輸出在 scripts/video/out/，不進 git）
 ```
 
 ## 不要改掉的決策（有原因）
@@ -166,7 +170,7 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 ## 下一步（建議順序）
 
 1. 部署到 https，在 iPhone 與 Android 實測：Gemini 任務卡（綠色標籤）、好友排行兩機同步、拍車、AR 召喚。把錯誤訊息修掉。
-2. 錄製 3 分鐘影片的實機片段（步驟見 `docs/video-script.md` 最後一節）。
+2. 3 分鐘影片已由 `scripts/video/` 自動產生（腳本見 `docs/video-script.md`）；決賽前可補實機的拍車 AR 片段。
 3. 更新簡報：P9 架構（原型實際技術）、車資與 SOM、痛點頁補上資料發現。
 4. 決賽前：BigQuery ML ARIMA_PLUS 實跑（`data-pipeline/data/processed/bigquery/sql/`）並把結果接進營運頁；司機端畫面；任務完成的位置驗證（目前「我到了」是直接完成）。
 

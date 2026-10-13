@@ -21,3 +21,5 @@ data-pipeline/data/osrm/
 # 測試產物
 scripts/output/
 scripts/fixtures/
+# 影片製作的錄影、旁白、成片（體積大，可重新產生）
+scripts/video/out/
