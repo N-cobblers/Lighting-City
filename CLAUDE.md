@@ -74,8 +74,8 @@ python scripts/ocr_check.py           # 用 onnxruntime 檢查車牌辨識模型
 python scripts/export_glb.py          # 需先 npm run dev；重新匯出 AR 用的小精靈 GLB
 python scripts/video/sprite/render_sprite.py preview|actions   # 小精靈設計預覽圖；影片用的動畫 PNG 序列（pop、hello、fly、point、cheer、bye、idle）
 
-# 3 分鐘影片：自動錄 App、開場結尾地圖、旁白（edge-tts）、合成（ffmpeg），步驟見 scripts/video/README.md
-python scripts/video/compose.py all
+# 3 分鐘影片：自動錄 App（強制 2.5 倍）、地圖場景、配音（edge-tts 兩種聲音）、網頁舞台逐格合成 1440p，步驟見 scripts/video/README.md
+python scripts/video/timeline.py && python scripts/video/render.py scripts/video/out/tl.json scripts/video/out/video.mp4 && python scripts/video/mix.py
 
 # 部署（需先建立 .firebaserc）
 npx firebase-tools deploy --only hosting,firestore:rules
@@ -122,7 +122,7 @@ functions/              錯峰點燈後端：recordTrip（錯峰判斷、Points 
 .github/workflows/ci.yml  每個 PR 自動跑：App 建置與單元測試、Cloud Functions 模擬器測試、e2e
 data-pipeline/          yoxi 資料前處理、分析、預測（含 14 號 LightGBM 等車模型）、匯出（Python）與 BigQuery ML SQL
 docs/                   提案決策、研究報告、資料分析報告（data-analysis-report.md）、影片腳本、簡報原始檔、示範車牌
-scripts/video/          3 分鐘方案說明影片的自動錄製與合成（旁白 script_data.py、分鏡 shots.py；輸出在 scripts/video/out/，不進 git）
+scripts/video/          3 分鐘方案說明影片的自動錄製與合成（台詞 script.py、分鏡 timeline.py、網頁舞台 stage.html；輸出在 scripts/video/out/，不進 git）。錄 App 畫面要用 --force-device-scale-factor，只靠 Playwright 的 device_scale_factor 模擬的話，CDP 錄下來只有 1 倍
 ```
 
 ## 不要改掉的決策（有原因）

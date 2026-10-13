@@ -27,7 +27,8 @@ pointer-events:none;z-index:2147483647;animation:rec-tap .6s ease-out forwards}
 
 
 class Recorder:
-    def __init__(self, out):
+    def __init__(self, out, dpr=2.5):
+        self.dpr = dpr
         self.out = out
         self.frames_dir = os.path.join(out, 'frames')
         os.makedirs(self.frames_dir, exist_ok=True)
@@ -40,18 +41,18 @@ class Recorder:
     async def start(self, ctx, page):
         self.cdp = await ctx.new_cdp_session(page)
         self.cdp.on('Page.screencastFrame', self._frame)
-        await self.cdp.send('Page.startScreencast', {'format': 'jpeg', 'quality': 92, 'maxWidth': 780, 'maxHeight': 1688, 'everyNthFrame': 1})
+        await self.cdp.send('Page.startScreencast', {'format': 'jpeg', 'quality': 92, 'maxWidth': int(390 * self.dpr), 'maxHeight': int(844 * self.dpr), 'everyNthFrame': 1})
         self.on = True
 
     def _frame(self, ev):
         if not self.on:
             return
+        asyncio.ensure_future(self.cdp.send('Page.screencastFrameAck', {'sessionId': ev['sessionId']}))
         i = len(self.frames) + 1
         name = f'{i:06d}.jpg'
         with open(os.path.join(self.frames_dir, name), 'wb') as f:
             f.write(base64.b64decode(ev['data']))
         self.frames.append([name, ev['metadata']['timestamp']])
-        asyncio.ensure_future(self.cdp.send('Page.screencastFrameAck', {'sessionId': ev['sessionId']}))
 
     def mark(self, name):
         self.markers.append([name, time.time()])
@@ -74,15 +75,16 @@ async def main():
     ap.add_argument('--url', default='http://localhost:4173/')
     ap.add_argument('--out', default=str(OUT / 'rec' / 'story'))
     ap.add_argument('--sections', default='morning,personas,noon,scan,evening,ops')
+    ap.add_argument('--dpr', type=float, default=2.5)
     a = ap.parse_args()
     sections = a.sections.split(',')
-    rec = Recorder(a.out)
+    rec = Recorder(a.out, a.dpr)
     problems = []
 
-    args = GPU_ARGS + ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', f'--use-file-for-fake-video-capture={Y4M}']
+    args = GPU_ARGS + [f'--force-device-scale-factor={a.dpr}', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', f'--use-file-for-fake-video-capture={Y4M}']
     async with async_playwright() as p:
         b = await p.chromium.launch(headless=True, executable_path=CHROME, args=args)
-        ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, locale='zh-TW', timezone_id='Asia/Taipei',
+        ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=a.dpr, locale='zh-TW', timezone_id='Asia/Taipei',
                                   permissions=['camera', 'geolocation'], geolocation={'latitude': 25.0376, 'longitude': 121.5636})
         await ctx.add_init_script(f"""(() => {{ try {{
             const k = {json.dumps(SETTINGS_KEY)};

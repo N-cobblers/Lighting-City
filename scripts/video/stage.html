@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+TC:wght@500;700;900&display=block" rel="stylesheet">
+<style>
+  :root { --lamp: #FFC94A; --lamp-deep: #E89A1E; --cream: #FFF4DC; --ink: #16233F; --night: #0E1830; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #070d1c; font-family: 'Noto Sans TC', sans-serif; }
+  #stage { position: absolute; inset: 0; overflow: hidden; z-index: 0; }
+  .shot { position: absolute; inset: 0; overflow: hidden; opacity: 0; visibility: hidden; }
+  .bg { position: absolute; inset: -40px; }
+  .bg.dawn { background: radial-gradient(1200px 700px at 30% 20%, #FFFFFF 0%, rgba(255,255,255,0) 60%), linear-gradient(160deg, #EAF4FF 0%, #D6E8FF 50%, #C3DAFB 100%); }
+  .bg.day { background: radial-gradient(1100px 650px at 70% 15%, #FFF9EC 0%, rgba(255,249,236,0) 60%), linear-gradient(160deg, #FFFFFF 0%, #F2F6FB 55%, #E3EBF6 100%); }
+  .bg.dusk { background: radial-gradient(900px 600px at 80% 20%, rgba(255,170,120,.45) 0%, rgba(255,170,120,0) 60%), linear-gradient(160deg, #855A8F 0%, #533A6C 48%, #2B2140 100%); }
+  .bg.night { background: radial-gradient(1000px 640px at 25% 15%, rgba(255,201,74,.10) 0%, rgba(255,201,74,0) 60%), linear-gradient(160deg, #182C5A 0%, #0E1830 55%, #0A1226 100%); }
+  .bg.ink { background: #070d1c; }
+  .dots { position: absolute; inset: -40px; opacity: .55; pointer-events: none;
+    background-image: radial-gradient(circle, rgba(255,201,74,.35) 1.4px, transparent 1.6px); background-size: 46px 46px; }
+  .bg.dawn + .dots, .bg.day + .dots { background-image: radial-gradient(circle, rgba(232,154,30,.22) 1.4px, transparent 1.6px); }
+  .scene { position: absolute; inset: 0; width: 1920px; height: 1080px; object-fit: cover; }
+  .scrim { position: absolute; inset: 0; background: #070d1c; opacity: 0; }
+  /* 手機 */
+  .phone { position: absolute; left: 0; top: 0; width: 520px; height: 1124px; border-radius: 72px; transform-origin: 0 0;
+    background: linear-gradient(145deg, #2a3142 0%, #0b0f1a 40%, #151b29 100%);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.12) inset, 0 0 0 9px #0b0f1a inset, 0 50px 110px rgba(5,10,25,.45), 0 12px 30px rgba(5,10,25,.3); }
+  .phone .screen { position: absolute; left: 14px; top: 14px; width: 492px; height: 1096px; border-radius: 58px; overflow: hidden; background: #111827; }
+  .phone .screen img { position: absolute; left: 0; top: 0; width: 492px; height: 1096px; transform-origin: 0 0; }
+  .phone .glare { position: absolute; inset: 14px; border-radius: 58px; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 28%); }
+  .plabel { position: absolute; left: 0; top: 0; transform: translate(-50%, 0); white-space: nowrap; font-weight: 900; font-size: 34px; color: #fff;
+    background: rgba(10,16,34,.78); padding: 8px 22px; border-radius: 999px; }
+  .plabel b { color: var(--lamp); }
+  /* 文字 */
+  .txt { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform, opacity; }
+  .t-kicker { font-size: 34px; font-weight: 900; letter-spacing: .08em; color: var(--lamp-deep); }
+  .t-title { font-size: 78px; font-weight: 900; line-height: 1.15; letter-spacing: .02em; color: var(--ink); }
+  .t-line { font-size: 46px; font-weight: 700; line-height: 1.4; color: var(--ink); }
+  .t-label { font-size: 32px; font-weight: 700; color: rgba(22,35,63,.7); }
+  .t-big { font-family: 'Fredoka', 'Noto Sans TC', sans-serif; font-weight: 700; font-size: 220px; line-height: 1; color: var(--lamp-deep); letter-spacing: -.01em; }
+  .t-huge { font-family: 'Fredoka', 'Noto Sans TC', sans-serif; font-weight: 700; font-size: 330px; line-height: .95; color: var(--lamp); letter-spacing: -.02em;
+    text-shadow: 0 0 60px rgba(255,201,74,.45), 0 8px 30px rgba(0,0,0,.5); }
+  .t-hero { font-size: 150px; font-weight: 900; letter-spacing: .06em; color: #fff; text-shadow: 0 0 40px rgba(255,201,74,.55), 0 6px 26px rgba(0,0,0,.6); }
+  .t-hero b { font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--lamp); margin-right: 22px; letter-spacing: 0; }
+  .t-tagline { font-size: 64px; font-weight: 900; letter-spacing: .14em; color: #FFF1C9; text-shadow: 0 4px 20px rgba(0,0,0,.6); }
+  .t-shade { width: 1500px; height: 520px; border-radius: 50%; background: radial-gradient(ellipse at 50% 50%, rgba(7,13,28,.9) 0%, rgba(7,13,28,.72) 42%, rgba(7,13,28,0) 70%); }
+  .t-chip { font-size: 34px; font-weight: 900; padding: 10px 26px; border-radius: 999px; background: var(--ink); color: #FFE6A3; }
+  .t-card { width: 360px; padding: 30px 32px; border-radius: 36px; background: #fff; color: var(--ink); white-space: normal;
+    box-shadow: 0 24px 60px rgba(5,10,25,.25); font-size: 40px; font-weight: 900; line-height: 1.3; }
+  .t-card small { display: block; font-size: 28px; font-weight: 700; color: rgba(22,35,63,.62); margin-top: 10px; }
+  .t-card .ic { font-family: 'Fredoka', sans-serif; font-size: 64px; color: var(--lamp-deep); line-height: 1; margin-bottom: 14px; display: block; }
+  .dark .t-title, .dark .t-line { color: #F6F1E3; }
+  .dark .t-label { color: rgba(246,241,227,.75); }
+  .dark .t-big { color: var(--lamp); text-shadow: 0 0 40px rgba(255,201,74,.35); }
+  .dark .t-kicker { color: var(--lamp); }
+  .dark .t-chip { background: rgba(255,201,74,.18); color: #FFE6A3; }
+  .hl { background: linear-gradient(transparent 62%, rgba(255,201,74,.55) 62%); padding: 0 4px; }
+  .dark .hl { background: linear-gradient(transparent 62%, rgba(255,201,74,.38) 62%); }
+  /* 題目標籤 */
+  .tag { position: absolute; right: 56px; top: 50px; font-size: 30px; font-weight: 900; padding: 10px 24px 10px 20px; border-radius: 999px;
+    background: rgba(255,201,74,.95); color: #3a2400; box-shadow: 0 10px 26px rgba(0,0,0,.18); }
+  .tag i { font-style: normal; margin-right: 8px; }
+  /* 小精靈 */
+  .sprite { position: absolute; left: 0; top: 0; width: 360px; height: 360px; transform-origin: 50% 50%; pointer-events: none; }
+  /* 字幕 */
+  #sub { position: absolute; z-index: 10; left: 50%; bottom: 46px; transform: translateX(-50%); max-width: 1560px; padding: 14px 34px 16px; border-radius: 22px;
+    background: rgba(10,16,34,.84); color: #fff; font-size: 44px; font-weight: 700; line-height: 1.4; text-align: center; letter-spacing: .02em;
+    box-shadow: 0 8px 26px rgba(0,0,0,.28); opacity: 0; white-space: nowrap; }
+  #sub b { color: var(--lamp); font-weight: 900; }
+  #sub.sub-sprite { background: #FFC94A; color: #2a1a00; padding-left: 92px; }
+  #sub.sub-sprite b { color: #7a3d00; }
+  #sub .face { position: absolute; left: 16px; top: 50%; width: 66px; height: 66px; margin-top: -33px; display: none; }
+  #sub.sub-sprite .face { display: block; }
+  /* 分割對比 */
+  .split { position: absolute; top: 0; bottom: 0; width: 960px; overflow: hidden; }
+  .split .clock { position: absolute; left: 50%; top: 250px; transform: translateX(-50%); font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 190px; color: #fff; }
+  .split .when { position: absolute; left: 50%; top: 110px; transform: translateX(-50%); font-size: 56px; font-weight: 900; color: #fff; white-space: nowrap; }
+  .split .road { position: absolute; left: 120px; right: 120px; top: 640px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.25); }
+  .split .car { position: absolute; top: 590px; width: 120px; height: 62px; border-radius: 22px 30px 14px 14px; background: #FFC94A;
+    box-shadow: 0 0 30px rgba(255,201,74,.7); }
+  .split .car::before, .split .car::after { content: ''; position: absolute; bottom: -14px; width: 28px; height: 28px; border-radius: 50%; background: #1b2234; }
+  .split .car::before { left: 16px; } .split .car::after { right: 16px; }
+  .split .pin { position: absolute; top: 560px; right: 150px; width: 26px; height: 90px; }
+  .split .pin::before { content: ''; position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: #fff; }
+  .split .pin::after { content: ''; position: absolute; left: 11px; top: 24px; width: 4px; height: 66px; background: #fff; }
+  .split .stat { position: absolute; left: 50%; top: 760px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+  .split .stat .v { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 120px; line-height: 1; }
+  .split .stat .l { font-size: 34px; font-weight: 700; color: rgba(255,255,255,.8); }
+  #fx { position: absolute; inset: 0; pointer-events: none; z-index: 9; }
+  #flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(255,240,200,1) 0%, rgba(255,201,74,.85) 18%, rgba(255,201,74,0) 55%); opacity: 0; }
+  #fade { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 11; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="fx"><div id="flash"></div></div>
+<div id="sub"><img class="face" alt=""><span></span></div>
+<div id="fade"></div>
+<script>
+const TL = window.__TL__;
+const FPS = TL.fps;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, x) => a + (b - a) * x;
+const easeIO = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const easeOut = (x) => { x = clamp(x); return 1 - Math.pow(1 - x, 3); };
+const backOut = (x) => { x = clamp(x); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const $ = (s, el = document) => el.querySelector(s);
+
+// 依時間取關鍵格的值：kf = [[t, ...values]]，回傳插值後的 values
+function kfAt(kf, t, ease = easeIO) {
+  if (!kf || !kf.length) return null;
+  if (t <= kf[0][0]) return kf[0].slice(1);
+  for (let i = 0; i < kf.length - 1; i++) {
+    const a = kf[i], b = kf[i + 1];
+    if (t <= b[0]) {
+      const x = ease((t - a[0]) / Math.max(1e-6, b[0] - a[0]));
+      return a.slice(1).map((v, k) => (typeof v === 'number' ? lerp(v, b[k + 1], x) : v));
+    }
+  }
+  return kf[kf.length - 1].slice(1);
+}
+// 錄影片段：clip = [[本地時間, 來源時間]]，線性對應（來源時間相同代表停格）
+function clipAt(clip, t) { return kfAt(clip, t, (x) => x)[0]; }
+function frameFile(src, s) {
+  const S = TL.sources[src];
+  const ts = S.ts;
+  let lo = 0, hi = ts.length - 1;
+  if (s <= ts[0]) return S.dir + S.files[0];
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (ts[mid] <= s) lo = mid; else hi = mid - 1; }
+  return S.dir + S.files[lo];
+}
+const pending = [];
+function setImg(img, src) {
+  if (img.dataset.src === src) return;
+  img.dataset.src = src;
+  img.src = src;
+  pending.push(img.decode().catch(() => {}));
+}
+
+// ---------- 建立每個鏡頭的 DOM ----------
+const stage = $('#stage');
+for (const sh of TL.shots) {
+  const el = document.createElement('div');
+  el.className = 'shot' + (sh.dark ? ' dark' : '');
+  el.innerHTML = `<div class="bg ${sh.bg || 'night'}"></div>${sh.dots ? '<div class="dots"></div>' : ''}`;
+  if (sh.scene) { sh._scene = document.createElement('img'); sh._scene.className = 'scene'; el.appendChild(sh._scene); sh._scrim = document.createElement('div'); sh._scrim.className = 'scrim'; el.appendChild(sh._scrim); }
+  sh._phones = (sh.phones || []).map((p) => {
+    const ph = document.createElement('div');
+    ph.className = 'phone';
+    ph.innerHTML = '<div class="screen"><img alt=""></div><div class="glare"></div>';
+    el.appendChild(ph);
+    if (p.label) { const lb = document.createElement('div'); lb.className = 'plabel'; lb.innerHTML = p.label; el.appendChild(lb); p._label = lb; }
+    p._el = ph; p._img = $('img', ph);
+    return p;
+  });
+  if (sh.split) {
+    sh._split = sh.split.map((s, i) => {
+      const d = document.createElement('div');
+      d.className = 'split';
+      d.style.left = (i * 960) + 'px';
+      d.style.background = s.bg;
+      d.innerHTML = `<div class="when">${s.when}</div><div class="clock">0:00</div><div class="road"></div><div class="pin"></div><div class="car"></div>
+        <div class="stat"><div class="v" style="color:${s.color}">${s.stat}</div><div class="l">${s.label}</div></div>`;
+      el.appendChild(d);
+      return { ...s, el: d };
+    });
+  }
+  sh._texts = (sh.texts || []).map((tx) => {
+    const d = document.createElement('div');
+    d.className = 'txt ' + (tx.cls || 't-line');
+    d.innerHTML = tx.html;
+    if (tx.w) d.style.width = tx.w + 'px', d.style.whiteSpace = 'normal';
+    if (tx.align === 'center') d.style.textAlign = 'center';
+    el.appendChild(d);
+    return { ...tx, el: d };
+  });
+  sh._sprites = (sh.sprites || []).map((sp) => {
+    const im = document.createElement('img');
+    im.className = 'sprite';
+    el.appendChild(im);
+    return { ...sp, el: im };
+  });
+  if (sh.tag) { const tg = document.createElement('div'); tg.className = 'tag'; tg.innerHTML = `<i>✦</i>${sh.tag.text}`; el.appendChild(tg); sh._tag = tg; }
+  stage.appendChild(el);
+  sh._el = el;
+}
+const subEl = $('#sub'), subSpan = $('#sub span'), subFace = $('#sub .face');
+
+// ---------- 每一格 ----------
+function renderShot(sh, t, alpha, enter) {
+  const lt = t - sh.t0;
+  const el = sh._el;
+  el.style.visibility = 'visible';
+  // 轉場：fade 或 slide（新鏡頭從右滑入）
+  if (enter && sh.enter === 'slide') { el.style.opacity = 1; el.style.transform = `translateX(${(1 - easeOut(alpha)) * 1920}px)`; }
+  else if (enter && sh.enter === 'zoom') { el.style.opacity = alpha; el.style.transform = `scale(${lerp(1.12, 1, easeOut(alpha))})`; }
+  else { el.style.opacity = alpha; el.style.transform = ''; }
+  if (sh.scene) {
+    const s = clipAt(sh.scene.clip, lt);
+    setImg(sh._scene, frameFile(sh.scene.src, s));
+    const sc = kfAt(sh.scene.scrim, lt);
+    sh._scrim.style.opacity = sc ? sc[0] : 0;
+    const zz = kfAt(sh.scene.zoom, lt);
+    sh._scene.style.transform = zz ? `scale(${zz[0]})` : '';
+  }
+  for (const p of sh._phones) {
+    const s = clipAt(p.clip, lt);
+    setImg(p._img, frameFile(p.src, s));
+    // 姿態：[t, 中心x, 中心y, 縮放, 旋轉Y]；或 focus：把螢幕上的 (fx, fy) 移到畫面 (X, Y)
+    const [x, y, sc, ry] = kfAt(p.pose, lt);
+    const W = 520 * sc, H = 1124 * sc;
+    let left = x - W / 2, top = y - H / 2;
+    const f = kfAt(p.focus, lt);
+    if (f && f[0] > 0) {
+      // f = [權重, 螢幕內 fx, fy (0-1), 目標 X, 目標 Y]
+      const fxPx = (14 + 492 * f[1]) * sc, fyPx = (14 + 1096 * f[2]) * sc;
+      left = lerp(left, f[3] - fxPx, f[0]);
+      top = lerp(top, f[4] - fyPx, f[0]);
+    }
+    p._el.style.transform = `translate(${left}px, ${top}px) perspective(2400px) rotateY(${ry || 0}deg) scale(${sc})`;
+    if (p._label) { p._label.style.transform = `translate(${left + W / 2}px, ${top + H + 24}px) translate(-50%, 0)`; p._label.style.opacity = clamp((lt - (p.labelAt || 0)) / 0.4); }
+  }
+  for (const tx of sh._texts) {
+    const a = lt - tx.t, out = tx.out != null ? lt - tx.out : -1;
+    let op = clamp(a / 0.35), dy = (1 - easeOut(a / 0.5)) * 34, s = 1;
+    if (tx.pop) { s = a < 0 ? .6 : lerp(.6, 1, backOut(a / 0.5)); dy = 0; }
+    if (out > 0) { op *= 1 - clamp(out / 0.3); dy -= easeOut(out / 0.3) * 20; }
+    tx.el.style.opacity = op.toFixed(3);
+    tx.el.style.transform = `translate(${tx.x}px, ${tx.y + dy}px) translate(${tx.anchor === 'center' ? '-50%' : tx.anchor === 'right' ? '-100%' : '0'}, 0) scale(${s})`;
+    if (tx.count && a > 0) {
+      const [from, to, dec, suffix, prefix] = tx.count;
+      const v = lerp(from, to, easeOut(a / (tx.countDur || 1.0)));
+      tx.el.textContent = (prefix || '') + v.toFixed(dec) + (suffix || '');
+    }
+    if (tx.clock && a > 0) {
+      const [m1, s1, dur] = tx.clock;
+      const total = (m1 * 60 + s1) * easeOut(a / dur);
+      tx.el.textContent = `${Math.floor(total / 60)}:${String(Math.floor(total % 60)).padStart(2, '0')}`;
+    }
+  }
+  for (const sp of sh._sprites) {
+    const a = lt - sp.t;
+    const seq = TL.sprite[sp.action];
+    if (!seq || a < 0 || (sp.out != null && lt > sp.out + 0.3)) { sp.el.style.opacity = 0; continue; }
+    let i = Math.floor(a * FPS);
+    i = sp.loop ? i % seq.n : Math.min(i, seq.n - 1);
+    setImg(sp.el, seq.dir + String(i + 1).padStart(4, '0') + '.png');
+    const pos = kfAt(sp.path, lt) || [sp.x, sp.y, sp.scale || 1];
+    const fo = sp.out != null ? 1 - clamp((lt - sp.out) / 0.3) : 1;
+    sp.el.style.opacity = fo;
+    sp.el.style.transform = `translate(${pos[0] - 180}px, ${pos[1] - 180}px) scale(${(pos[2] || 1) * (sp.flip ? -1 : 1)}, ${pos[2] || 1})`;
+  }
+  if (sh._split) {
+    for (const s of sh._split) {
+      const a = lt - s.t;
+      const clockEl = $('.clock', s.el), car = $('.car', s.el);
+      const total = s.secs * easeIO(a / s.run);
+      clockEl.textContent = `${Math.floor(total / 60)}:${String(Math.floor(total % 60)).padStart(2, '0')}`;
+      clockEl.style.color = total >= 600 ? '#FF9A8A' : '#fff';
+      const arrive = clamp((a - s.run * .55) / (s.run * .45));
+      car.style.left = (s.arrives ? lerp(-160, 690, easeOut(arrive)) : -160) + 'px';
+      $('.stat', s.el).style.opacity = clamp((a - s.run) / .4);
+    }
+  }
+  if (sh._tag) {
+    const a = lt - sh.tag.t;
+    const vis = a < 0 ? 0 : a < 2.6 ? 1 : 1 - clamp((a - 2.6) / 0.35);
+    sh._tag.style.opacity = vis;
+    sh._tag.style.transform = `translateX(${(1 - easeOut(a / 0.4)) * 60}px)`;
+  }
+}
+
+window.renderAt = async function (t) {
+  pending.length = 0;
+  const X = TL.trans;
+  for (let i = 0; i < TL.shots.length; i++) {
+    const sh = TL.shots[i];
+    const inX = sh.enter === 'cut' ? 0 : X;
+    if (t < sh.t0 - 1e-6 || t >= sh.t1 + (TL.shots[i + 1] && TL.shots[i + 1].enter !== 'cut' ? X : 0)) { sh._el.style.visibility = 'hidden'; continue; }
+    const enter = inX > 0 && t < sh.t0 + inX;
+    const alpha = enter ? clamp((t - sh.t0) / inX) : 1;
+    sh._el.style.zIndex = i;
+    renderShot(sh, t, alpha, enter);
+  }
+  // 字幕
+  const s = TL.subs.find((x) => t >= x.t0 && t < x.t1);
+  if (s) {
+    if (subSpan.innerHTML !== s.html) subSpan.innerHTML = s.html;
+    subEl.className = s.who === 'sprite' ? 'sub-sprite' : '';
+    if (s.who === 'sprite' && TL.face) setImg(subFace, TL.face);
+    const a = Math.min(t - s.t0, s.t1 - t);
+    subEl.style.opacity = clamp(a / 0.12);
+  } else subEl.style.opacity = 0;
+  // 閃光與淡出
+  const fl = kfAt(TL.flash, t, (x) => x);
+  $('#flash').style.opacity = fl ? fl[0] : 0;
+  const fd = kfAt(TL.fade, t, (x) => x);
+  $('#fade').style.opacity = fd ? fd[0] : 0;
+  await Promise.all(pending);
+  return pending.length;
+};
+window.stageReady = document.fonts.ready.then(() => true);
+</script>
+</body>
+</html>
