@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useStore, type Tab } from './lib/store'
 import { onAiStatus, type AiStatus } from './lib/ai'
+import { DEMO_PERSONAS, getDemoPersona } from './data/demo'
 import { MapView } from './views/MapView'
 import { SpriteChat } from './views/SpriteChat'
 import { FriendsView } from './views/FriendsView'
@@ -37,6 +38,7 @@ export default function App() {
   }, [])
   const clock = `${String(s.now.getHours()).padStart(2, '0')}:${String(s.now.getMinutes()).padStart(2, '0')}`
   const aiLabel = ai.state === 'live' ? 'Gemini 連線中' : ai.state === 'error' ? 'Gemini 未連線，使用示範資料' : ai.state === 'demo' ? '示範模式' : 'AI 準備中'
+  const persona = getDemoPersona(s.settings.demoPersonaId)
 
   return (
     <div className="app">
@@ -47,6 +49,22 @@ export default function App() {
           <span className="proto">黑客松原型</span>
         </div>
         <div className="top-right">
+          <div className="persona-switch" aria-label="Demo 人物切換">
+            {DEMO_PERSONAS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={p.id === persona.id ? 'on' : ''}
+                title={`${p.name} · ${p.role}`}
+                onClick={() => {
+                  s.updateSettings({ demoPersonaId: p.id })
+                  s.toast(`${p.name} · ${p.role}`)
+                }}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
           <button className={`clock ${s.clockIsSim ? 'sim' : ''}`} onClick={() => setScriptOpen((o) => !o)} aria-expanded={scriptOpen} aria-label="一天劇本">
             {clock}
             {s.clockIsSim ? '・劇本' : ''}

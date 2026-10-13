@@ -36,6 +36,9 @@ button { font: inherit; color: inherit; }
 .logo-dot { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff6d0, var(--lamp) 55%, var(--amber)); box-shadow: 0 0 12px rgba(255, 201, 74, 0.8); }
 .proto { font-size: 11px; color: var(--ink); background: var(--lamp-2); padding: 2px 7px; border-radius: 999px; font-weight: 700; }
 .top-right { display: flex; align-items: center; gap: 8px; }
+.persona-switch { display: flex; align-items: center; gap: 4px; background: rgba(22, 38, 74, 0.9); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.persona-switch button { background: transparent; border: 0; border-radius: 999px; color: var(--muted); padding: 5px 8px; font-size: 11px; cursor: pointer; }
+.persona-switch button.on { background: var(--lamp); color: var(--ink); font-weight: 700; box-shadow: 0 0 10px rgba(255, 201, 74, 0.35); }
 .clock { font-family: var(--round); font-size: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 .clock.sim { border-color: var(--lamp); color: var(--lamp); }
 .icon-btn { background: none; border: 0; padding: 6px; border-radius: 10px; cursor: pointer; color: var(--muted); }

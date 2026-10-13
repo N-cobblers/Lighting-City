@@ -2,7 +2,7 @@ import { getFirebase } from './firebase'
 import type { Settings } from './settings'
 import type { Source, Task, Weather } from './types'
 import { POIS, poiById } from './geo'
-import { FALLBACK_CHAT, FALLBACK_CHAT_DEFAULT, FALLBACK_OPS, FALLBACK_TASKS, PERSONA, SLOT_LABEL, type Slot } from '../data/demo'
+import { FALLBACK_CHAT, FALLBACK_CHAT_DEFAULT, FALLBACK_OPS, FALLBACK_TASKS, PERSONA, SLOT_LABEL, getDemoPersona, type Slot } from '../data/demo'
 
 export type AiStatus = { state: 'idle' | 'live' | 'demo' | 'error'; detail?: string }
 type Listener = (s: AiStatus) => void
@@ -25,6 +25,7 @@ export type AiContext = {
   lucky: number
   litPct: number
   lowWindows: { district: string; hours: number[] }[]
+  demoPersonaId?: string
   tasks?: Task[]
   friendsTop?: string
 }
@@ -52,15 +53,16 @@ async function getModel(settings: Settings, opts: { json?: any; system?: string;
 function contextBlock(ctx: AiContext) {
   const hhmm = `${String(ctx.now.getHours()).padStart(2, '0')}:${String(ctx.now.getMinutes()).padStart(2, '0')}`
   const weekday = '日一二三四五六'[ctx.now.getDay()]
+  const persona = getDemoPersona(ctx.demoPersonaId || PERSONA.id)
   return JSON.stringify(
     {
       現在: `${ctx.now.getMonth() + 1}/${ctx.now.getDate()}（週${weekday}）${hhmm}，${SLOT_LABEL[ctx.slot]}`,
-      玩家: { 名字: PERSONA.name, 身分: PERSONA.role, 常用地點: [PERSONA.home.label, PERSONA.work.label], 習慣: PERSONA.habits },
+      玩家: { 名字: persona.name, 身分: persona.role, 常用地點: [persona.home.label, persona.work.label], 習慣: persona.habits },
       天氣: { 來源: ctx.weather.source === 'cwa' ? '中央氣象署' : '示範情境', 概況: ctx.weather.desc, 傍晚降雨機率: ctx.weather.eveningPop },
       需求低谷時段: ctx.lowWindows.map((w) => ({ 行政區: w.district, 平日小時: w.hours })),
       今日幸運數字: ctx.lucky,
       點亮進度: `${ctx.litPct}%`,
-      可用地點: POIS.filter((p) => p.kind !== 'home' && p.kind !== 'work').map((p) => ({ poiId: p.id, 名稱: p.name })).concat([{ poiId: 'home', 名稱: PERSONA.home.label }]),
+      可用地點: POIS.filter((p) => p.kind !== 'home' && p.kind !== 'work').map((p) => ({ poiId: p.id, 名稱: p.name })).concat([{ poiId: persona.home.poiId, 名稱: persona.home.label }]),
     },
     null,
     0,

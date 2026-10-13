@@ -141,7 +141,7 @@ export function MapView() {
   // tasks
   const regenerate = useCallback(async () => {
     setGenBusy(true)
-    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS })
+    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, demoPersonaId: s.settings.demoPersonaId })
     s.setTasks(r.tasks, r.greeting, r.source)
     setGenBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps

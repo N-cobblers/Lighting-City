@@ -12,6 +12,7 @@ export type Settings = {
   luckyOverride: string
   room: string
   nickname: string
+  demoPersonaId: string
   forceDemo: boolean
   allowRepeat: boolean
 }
@@ -29,6 +30,7 @@ export const defaultSettings: Settings = {
   luckyOverride: '',
   room: 'demo',
   nickname: '',
+  demoPersonaId: 'xiao-han',
   forceDemo: false,
   allowRepeat: false,
 }

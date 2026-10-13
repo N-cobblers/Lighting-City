@@ -1,39 +1,117 @@
 import type { Task } from '../lib/types'
 
-/** 示範玩家（虛構人物）。行為型態參考 yoxi 資料中常客的共同特徵：上下車集中在 2 個地點、行程集中在同一個 3 小時區段。 */
-export const PERSONA = {
-  name: '小涵',
-  age: 27,
-  role: '雙北通勤族',
-  home: { poiId: 'home', label: '家（松山區民生社區）' },
-  work: { poiId: 'work', label: '公司（信義區市府附近）' },
-  habits: [
-    '平日 18:00–20:00 下班常叫 yoxi 回家，常走敦化北路與信義軸線（近 30 天 9 次）',
-    '下雨的早上會叫車上班，偶爾沿著北台北的板橋／新店通勤路線切換',
-    '週末下午常去松菸、大巨蛋與淡水河岸一帶（近 30 天 2 次）',
-    '週末偶爾去饒河街夜市、象山，出差從松山機場出發，城市範圍已涵蓋雙北核心',
-  ],
-  history30d: [
-    { day: 2, route: 'commute-dunhua' },
-    { day: 3, route: 'commute-dunhua' },
-    { day: 5, route: 'commute-dunhua' },
-    { day: 8, route: 'weekend-raohe' },
-    { day: 10, route: 'commute-dunhua' },
-    { day: 11, route: 'commute-dunhua' },
-    { day: 15, route: 'commute-dunhua' },
-    { day: 16, route: 'commute-dunhua' },
-    { day: 19, route: 'commute-dunhua' },
-    { day: 22, route: 'airport' },
-    { day: 23, route: 'commute-dunhua' },
-    { day: 24, route: 'commute-dunhua' },
-    { day: 26, route: 'commute-dunhua' },
-    { day: 29, route: 'commute-dunhua' },
-    { day: 30, route: 'commute-dunhua' },
-    { day: 6, route: 'weekend-raohe' },
-    { day: 13, route: 'weekend-xiangshan' },
-    { day: 20, route: 'airport' },
-  ],
-  walkedPois: ['sunyatsen', 'fujin'],
+export type DemoPersona = {
+  id: string
+  name: string
+  age: number
+  role: string
+  home: { poiId: string; label: string }
+  work: { poiId: string; label: string }
+  habits: string[]
+  history30d: { day: number; route: string }[]
+  walkedPois: string[]
+}
+
+/** 示範玩家（虛構人物）。每個角色都代表一種不同的路網與生活型態，方便 demo 時直接看出雙北場景的差異。 */
+export const DEMO_PERSONAS: DemoPersona[] = [
+  {
+    id: 'xiao-han',
+    name: '小涵',
+    age: 27,
+    role: '信義區上班族',
+    home: { poiId: 'home', label: '家（松山區民生社區）' },
+    work: { poiId: 'work', label: '公司（信義區市府附近）' },
+    habits: [
+      '平日 18:00–20:00 下班常叫 yoxi 回家（近 30 天 9 次，平常走敦化北路）',
+      '下雨的早上會叫車上班（近 30 天 4 次）',
+      '週末下午常去松菸、大巨蛋一帶（近 30 天 2 次）',
+      '週末偶爾去饒河街夜市、象山，出差從松山機場出發',
+    ],
+    history30d: [
+      { day: 2, route: 'commute-dunhua' },
+      { day: 3, route: 'commute-dunhua' },
+      { day: 5, route: 'commute-dunhua' },
+      { day: 8, route: 'weekend-raohe' },
+      { day: 10, route: 'commute-dunhua' },
+      { day: 11, route: 'commute-dunhua' },
+      { day: 15, route: 'commute-dunhua' },
+      { day: 16, route: 'commute-dunhua' },
+      { day: 19, route: 'commute-dunhua' },
+      { day: 22, route: 'airport' },
+      { day: 23, route: 'commute-dunhua' },
+      { day: 24, route: 'commute-dunhua' },
+      { day: 26, route: 'commute-dunhua' },
+      { day: 29, route: 'commute-dunhua' },
+      { day: 30, route: 'commute-dunhua' },
+      { day: 6, route: 'weekend-raohe' },
+      { day: 13, route: 'weekend-xiangshan' },
+      { day: 20, route: 'airport' },
+    ],
+    walkedPois: ['sunyatsen', 'fujin'],
+  },
+  {
+    id: 'a-zhe',
+    name: '阿哲',
+    age: 34,
+    role: '板橋通勤族',
+    home: { poiId: 'banciao', label: '家（板橋車站）' },
+    work: { poiId: 'work', label: '公司（信義區市府附近）' },
+    habits: [
+      '週一到週五早晚通勤都走板橋到信義的主要幹線，低谷時段更容易回頭叫車',
+      '傍晚常在板橋轉乘，回程的空車指數習慣在 17:30–19:00 上升',
+      '週末會在淡水河岸走路，常用點亮街區補足非通勤日的活動紀錄',
+      '愛在大眾運輸與路邊上車點切換，對低谷景點任務比較有反應',
+    ],
+    history30d: [
+      { day: 1, route: 'banciao-commute' },
+      { day: 2, route: 'banciao-commute' },
+      { day: 4, route: 'banciao-commute' },
+      { day: 7, route: 'banciao-commute' },
+      { day: 9, route: 'banciao-commute' },
+      { day: 12, route: 'banciao-commute' },
+      { day: 14, route: 'banciao-commute' },
+      { day: 17, route: 'banciao-commute' },
+      { day: 18, route: 'weekend-xiangshan' },
+      { day: 21, route: 'banciao-commute' },
+      { day: 24, route: 'banciao-commute' },
+      { day: 27, route: 'banciao-commute' },
+      { day: 28, route: 'weekend-raohe' },
+    ],
+    walkedPois: ['banciao', 'sunyatsen'],
+  },
+  {
+    id: 'xiao-ya',
+    name: '小雅',
+    age: 29,
+    role: '淡水週末旅遊者',
+    home: { poiId: 'tamsui', label: '家（淡水老街）' },
+    work: { poiId: 'spot-cityhall', label: '工作（市府附近）' },
+    habits: [
+      '工作日傍晚常從淡水出發到台北市區，會順路逛河岸步道與文創空間',
+      '週末單日多路線切換，休閒目的地比通勤路線更分散',
+      '吃飯和散步任務最容易激發她打開 App，點亮河岸街區很有動力',
+      '喜歡用搭車和步行組合，不依賴固定兩點路線',
+    ],
+    history30d: [
+      { day: 3, route: 'tamsui-evening' },
+      { day: 6, route: 'weekend-raohe' },
+      { day: 8, route: 'tamsui-evening' },
+      { day: 10, route: 'weekend-xiangshan' },
+      { day: 12, route: 'tamsui-evening' },
+      { day: 15, route: 'afternoon-songyan' },
+      { day: 20, route: 'weekend-raohe' },
+      { day: 23, route: 'tamsui-evening' },
+      { day: 25, route: 'weekend-xiangshan' },
+      { day: 29, route: 'tamsui-evening' },
+    ],
+    walkedPois: ['tamsui', 'raohe', 'songyan'],
+  },
+]
+
+export const PERSONA = DEMO_PERSONAS[0]
+
+export function getDemoPersona(id?: string | null) {
+  return DEMO_PERSONAS.find((persona) => persona.id === id) || PERSONA
 }
 
 export type Slot = 'morning' | 'lunch' | 'afternoon' | 'evening'

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../lib/store'
 import { DEFAULT_MODEL, type Settings } from '../lib/settings'
+import { DEMO_PERSONAS } from '../data/demo'
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const s = useStore()
@@ -54,6 +55,16 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         <label className="field" htmlFor="room">
           <span>好友房間代碼（同一個代碼的人會在同一個排行）</span>
           <input id="room" className="input" value={d.room} onChange={(e) => set({ room: e.target.value })} />
+        </label>
+        <label className="field" htmlFor="demo-persona">
+          <span>Demo 玩家（不同人會看到不同路網與任務偏好）</span>
+          <select id="demo-persona" className="input" value={d.demoPersonaId} onChange={(e) => set({ demoPersonaId: e.target.value })}>
+            {DEMO_PERSONAS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} · {p.role}
+              </option>
+            ))}
+          </select>
         </label>
 
         <h4>天氣</h4>

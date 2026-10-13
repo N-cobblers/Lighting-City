@@ -3,7 +3,7 @@ import { cellToChildren, getResolution } from 'h3-js'
 import { loadSettings, readJSON, saveSettings, writeJSON, type Settings } from './settings'
 import type { Collected, Source, Task, Weather } from './types'
 import { AREA_SET, RES, cellAt, poiById, routeById, routeCells } from './geo'
-import { PERSONA, slotOf } from '../data/demo'
+import { PERSONA, getDemoPersona, slotOf, type DemoPersona } from '../data/demo'
 import { luckyNumber } from './lucky'
 import { fetchCwa, rainScenario } from './weather'
 import demand from '../data/demand.json'
@@ -30,37 +30,39 @@ function expandToCurrentResolution<T>(cells: Record<string, T>): Record<string, 
   return expanded
 }
 
-function loadBaseLit(): Record<string, number> {
+function loadBaseLit(persona: DemoPersona = PERSONA): Record<string, number> {
   const current = readJSON<Record<string, number> | null>(LIT_KEY, null)
   if (current && typeof current === 'object') return current
   for (const key of LEGACY_LIT_KEYS) {
     const legacy = readJSON<Record<string, number> | null>(key, null)
     if (legacy && typeof legacy === 'object') return expandToCurrentResolution(legacy)
   }
-  return initialBaseLit()
+  return initialBaseLit(persona)
 }
 
-function initialBaseLit(): Record<string, number> {
+function initialBaseLit(persona: DemoPersona = PERSONA): Record<string, number> {
   const lit: Record<string, number> = {}
-  for (const id of PERSONA.walkedPois) {
+  for (const id of persona.walkedPois) {
     const p = poiById(id)
     if (p) lit[cellAt(p.lng, p.lat)] = 2
   }
   return lit
 }
 
-function initialVisitHistory(now = Date.now()): VisitHistory {
+function initialVisitHistory(now = Date.now(), persona: DemoPersona = PERSONA): VisitHistory {
   const visits: VisitHistory = {}
-  for (const h of PERSONA.history30d) {
+  for (const h of persona.history30d) {
     const visitedAt = now - (30 - h.day) * DAY_MS
-    for (const { cell } of routeCells(routeById(h.route).path)) {
+    const route = routeById(h.route)
+    if (!route) continue
+    for (const { cell } of routeCells(route.path)) {
       visits[cell] = [...(visits[cell] || []), visitedAt].sort((a, b) => a - b).slice(-3)
     }
   }
   return visits
 }
 
-function loadVisitHistory(): VisitHistory {
+function loadVisitHistory(personaId: string = PERSONA.id): VisitHistory {
   const stored = readJSON<VisitHistory | null>(VISIT_KEY, null)
   if (stored && typeof stored === 'object') {
     return expandToCurrentResolution(Object.fromEntries(
@@ -89,7 +91,7 @@ function loadVisitHistory(): VisitHistory {
     )
     return expandToCurrentResolution(visits)
   }
-  return initialVisitHistory()
+  return initialVisitHistory(Date.now(), getDemoPersona(personaId))
 }
 
 function glowLevel(times: number[], now: number) {
@@ -142,8 +144,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [simClock, setSimClock] = useState<{ h: number; m: number } | null>(null)
   const [tick, setTick] = useState(0)
   const [weather, setWeather] = useState<Weather>(() => rainScenario(new Date()))
-  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => loadBaseLit())
-  const [visits, setVisits] = useState<VisitHistory>(() => loadVisitHistory())
+  const [baseLit, setBaseLit] = useState<Record<string, number>>(() => loadBaseLit(getDemoPersona(loadSettings().demoPersonaId)))
+  const [visits, setVisits] = useState<VisitHistory>(() => loadVisitHistory(loadSettings().demoPersonaId))
   const [tasks, setTaskList] = useState<Task[]>([])
   const [greeting, setGreeting] = useState('')
   const [tasksSource, setTasksSource] = useState<Source | null>(null)
@@ -200,6 +202,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     setSettings((s) => {
       const next = { ...s, ...patch }
+      if (patch.demoPersonaId && patch.demoPersonaId !== s.demoPersonaId) {
+        const persona = getDemoPersona(next.demoPersonaId)
+        setBaseLit(initialBaseLit(persona))
+        setVisits(initialVisitHistory(Date.now(), persona))
+        setCollected([])
+      }
       saveSettings(next)
       return next
     })
@@ -259,8 +267,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     lightCells,
     recordRideCells,
     resetLit: () => {
-      const nextBase = initialBaseLit()
-      const nextVisits = initialVisitHistory()
+      const persona = getDemoPersona(settings.demoPersonaId)
+      const nextBase = initialBaseLit(persona)
+      const nextVisits = initialVisitHistory(Date.now(), persona)
       baseLitRef.current = nextBase
       visitsRef.current = nextVisits
       setBaseLit(nextBase)

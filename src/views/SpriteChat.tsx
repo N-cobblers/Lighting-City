@@ -34,7 +34,7 @@ export function SpriteChat() {
     setBusy(true)
     const history = msgs.slice(1).map(({ role, text }) => ({ role, text }))
     setMsgs((m) => [...m, { role: 'user', text: t }, { role: 'model', text: '' }])
-    const ctx = { now: s.now, slot: slotOf(s.now), weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, tasks: s.tasks }
+    const ctx = { now: s.now, slot: slotOf(s.now), weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS, demoPersonaId: s.settings.demoPersonaId, tasks: s.tasks }
     const source = await chatReply(s.settings, ctx, history, t, (partial) =>
       setMsgs((m) => {
         const next = m.slice()
