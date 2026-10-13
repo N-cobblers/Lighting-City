@@ -10,6 +10,7 @@
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -43,7 +44,9 @@ def main():
         page = ctx.new_page()
         page.on('console', lambda m: logs.append(f'[{m.type}] {m.text}'[:300]))
         page.on('pageerror', lambda e: failures.append(f'pageerror: {e}'[:500]))
-        tab = lambda name: page.get_by_role('button', name=name, exact=True).click()
+        # 小精靈分頁有新預報時，名稱後面會多「（有新預報）」給讀屏軟體
+        tab = lambda name: page.get_by_role('button', name=re.compile('^' + re.escape(name) + r'\s*(（有新預報）)?$')).click()
+        phase = lambda: page.evaluate('document.documentElement.dataset.phase')
 
         def script_step(i):
             page.get_by_role('button', name='一天劇本').click()
@@ -55,7 +58,14 @@ def main():
         page.wait_for_timeout(9000)
         if page.locator('.tab-dot').count() == 0:
             failures.append('小精靈分頁沒有亮出新預報的紅點')
+        script_step(0)  # 早上 08:30：早晨配色、淺色底圖
+        page.wait_for_timeout(3000)
+        if phase() != 'dawn':
+            failures.append(f'08:30 應該是早晨配色，實際是 {phase()}')
+        shot(page, 'p1_dawn')
         script_step(1)  # 午休 12:30：步行、拍車、搭車各一張卡
+        if phase() != 'day':
+            failures.append(f'12:30 應該是白天配色，實際是 {phase()}')
         shot(page, '01_map')
         start = page.locator('.chip-lamp').first.inner_text()
 
@@ -134,7 +144,16 @@ def main():
         page.get_by_role('button', name='← 回乘客畫面').click()
         page.wait_for_timeout(500)
 
+        script_step(2)  # 路上 15:00：黃昏配色
+        tab('城市')
+        page.wait_for_timeout(3000)
+        if phase() != 'dusk':
+            failures.append(f'15:00 應該是黃昏配色，實際是 {phase()}')
+        shot(page, 'p3_dusk')
+
         script_step(3)  # 傍晚 18:05：小精靈預報
+        if phase() != 'night':
+            failures.append(f'18:05 應該是夜晚配色，實際是 {phase()}')
         shot(page, '08_evening')
         page.get_by_role('button', name='現在走').click()
         page.wait_for_timeout(2600)

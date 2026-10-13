@@ -89,9 +89,11 @@ src/
   lib/social.ts         Firestore 好友排行 rooms/{room}-{日期}/players/{uid}
   lib/weather.ts        氣象署 F-C0032-001 與「傍晚下雨」情境
   lib/forecast.ts       小精靈的「你的下一趟」叫車預報（demand.json 信義區各星期幾逐時等車中位數）
-  views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap 暗色，失敗改離線底圖）、亮度圖例、搭車點亮動畫、任務卡輪播（不搭車的在前）
+  lib/phase.ts          一天四個時段（早晨、白天、黃昏、夜晚）：各時段的地圖底圖、點亮格子與軌跡顏色
+  views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap，依時段換底圖，失敗改離線底圖）、亮度圖例、搭車點亮動畫、任務卡輪播（不搭車的在前）
   views/ScanView.tsx    相機取景、辨識、小精靈、AR 召喚（model-viewer）
   views/SpriteChat.tsx  小精靈對話；第一句是叫車預報，附「準時預約／晚點走／現在走」
+  views/SpriteAvatar.tsx 2D 小精靈頭像；玩家自己的小精靈依時段換表情與配色（早晨睡眼、黃昏圍巾、夜晚星星眼）
   views/FriendsView.tsx 幸運數字、好友排行、圖鑑
   views/OpsView.tsx     營運（頂欄「營運」進入的全螢幕頁，不放在乘客分頁）：需求熱度地圖、低谷時段、下一週預測、AI 派任務
   data/demand.json      由 data-pipeline 匯出的彙總指數（0–100），不含個別行程
@@ -138,10 +140,11 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 
 - Firebase JS SDK v13 的 `Part` 要寫 `{ type: 'text', text }`。
 - `lib/ai.ts` 用 `Schema.object(...)` 做結構化輸出，回傳後一律再做欄位驗證與截斷。
+- 換時段換底圖用 `setStyle(url, { diff: false })`，點亮格子等圖層在 `style.load` 重新疊上；早晨與白天同一張底圖，只換格子顏色。
 - 地圖的 bottom sheet 會蓋住下半部，`fitBounds` 要帶 padding；`flyTo` 不要帶 padding（會留在地圖上，之後的 `fitBounds` 會被多扣一次而拉得很遠），改用 `offset`。搭車時先收起 sheet，`maxZoom` 13.9。
 - 拍車流程要先 `cropForOcr` 再停相機，否則會讀到黑畫面。
 - e2e 的假相機影片必須是直式（手機相機是直式；橫式影片在直式容器裡會被裁掉車牌）。
-- 視覺：深藍夜色 `#0E1830`、車燈暖黃 `#FFC94A`、奶油白 `#F5F0E6`、字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo。
+- 視覺：一天分四個時段換色，劇本的 08:30、12:30、15:00、18:05 各落一段：早晨 5–10 點淺藍天空 `#DCEBFF`、白天 10–15 點明亮 `#F4F7FB`、黃昏 15–18 點紫色晚霞（`#6B4A7A`→`#2B2140`）、夜晚 18–5 點深藍夜色 `#0E1830`。車燈暖黃 `#FFC94A` 是按鈕與重點色，全天不變；早晨、白天的點亮格子改用琥珀橘系（淡黃在淺色底圖上看不見），黃昏、夜晚是暖黃光暈，越常去越接近白熱。配色變數在 `styles.css` 的 `:root[data-phase]`（App 依劇本時間設定 `<html data-phase>`，換時段時有 1 秒淡入淡出），底圖（OpenFreeMap positron／fiord／dark）與格子顏色在 `lib/phase.ts`。營運頁固定用夜晚配色。每個時段的文字對比都要至少 4.5:1（大字 3:1），改顏色後要重新檢查。字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo。
 
 ## 下一步（建議順序）
 
