@@ -343,6 +343,8 @@ textarea.input { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .msg { display: flex; flex-direction: column; gap: 8px; }
 .chat-choices { display: flex; gap: 8px; flex-wrap: wrap; }
 .chat-choices button { padding: 8px 14px; }
+.city-line { flex-basis: 100%; margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.demo-mini { font-size: 10.5px; line-height: 1.5; padding: 0 6px; border-radius: 999px; background: var(--demo-bg); color: var(--demo-fg); border: 1px solid var(--demo-line); }
 .bubble .src { display: block; margin-top: 4px; font-size: 10.5px; color: var(--muted); }
 .bubble .src.live { color: var(--ok-text); }
 .typing { display: inline-flex; gap: 4px; }
@@ -424,6 +426,10 @@ input[type='range'] { width: 100%; accent-color: var(--lamp); }
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .kpis div { background: var(--surface-2); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
 .kpis b { font-family: var(--round); font-size: 22px; color: var(--title); }
+.kpis-2 { grid-template-columns: repeat(2, 1fr); }
+.offpeak-line { margin: 0; color: var(--accent-text-2); font-weight: 700; }
+.offpeak-card .reason { margin: 0; color: var(--text-2); background: var(--surface-2); border-radius: 12px; padding: 8px 10px; }
+.offpeak-rules { margin: 0; padding-left: 18px; color: var(--text-2); display: flex; flex-direction: column; gap: 3px; }
 
 /* modal, toasts, script */
 .modal { position: absolute; inset: 0; background: rgba(5, 10, 22, 0.6); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }

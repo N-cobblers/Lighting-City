@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore, LOW_WINDOWS } from '../lib/store'
 import { chatReply, type ChatTurn } from '../lib/ai'
 import { forecastText, nextRideForecast, LATER_HOUR } from '../lib/forecast'
+import { CITY_DEMO } from '../lib/offpeak'
 import { slotOf } from '../data/demo'
 import { SpriteAvatar } from './SpriteAvatar'
 import type { Source } from '../lib/types'
@@ -26,6 +27,8 @@ export function SpriteChat() {
   const [focusCard, setFocusCard] = useState<string | null>(null)
   const end = useRef<HTMLDivElement>(null)
   const forecast = nextRideForecast(s.now, s.homeRideDay === new Date().toDateString())
+  // 錯峰點燈只給城市層級的數字（示範），放在三個選擇旁邊
+  const cityLine = forecast.isToday ? `今天已有 ${CITY_DEMO.today} 人選「晚點走」` : `已有 ${CITY_DEMO.tomorrow} 人先排好${forecast.when.replace(` 18 點`, '')}晚點走`
 
   useEffect(() => {
     if (msgs.length) return
@@ -53,18 +56,18 @@ export function SpriteChat() {
     const later = forecast.laterLead.toFixed(1)
     if (c === '現在走') {
       say(c, `好，現在幫你叫車！司機約 ${forecast.nowWait} 分鐘到，等車時我陪你。`)
-      goRide({ routeId: 'evening-home', boost: 1, waitMin: forecast.nowWait })
+      goRide({ routeId: 'evening-home', reserved: false, waitMin: forecast.nowWait })
       return
     }
     if (c === '準時預約') {
       if (forecast.isNow) {
         const pickup = new Date(s.now.getTime() + 5 * 60000)
         say(c, `好，幫你預約 ${hhmm(pickup)} 從市府路上車點出發。準時出發，路線亮兩階！`)
-        goRide({ routeId: 'evening-home', boost: 2 })
+        goRide({ routeId: 'evening-home', reserved: true })
         return
       }
       if (forecast.isToday) {
-        s.addTask({ id: RESERVED_TASK_ID, title: '已預約 18:10 回家', detail: '18:10 從市府路上車點出發，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '18:10', rewardCells: 12, rewardCredit: 0, reason: '預約讓司機提早安排，尖峰也準時' })
+        s.addTask({ id: RESERVED_TASK_ID, title: '已預約 18:10 回家', detail: '18:10 從市府路上車點出發，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '18:10', rewardCells: 12, rewardCredit: 0, reason: '預約讓司機提早安排，尖峰也準時', pinned: true })
         setFocusCard(RESERVED_TASK_ID)
         say(c, '好，幫你預約今天 18:10 從市府路上車點出發，已放進今日任務。準時出發，路線亮兩階！')
         return
@@ -74,7 +77,7 @@ export function SpriteChat() {
     }
     // 晚點走
     if (forecast.isToday) {
-      s.addTask({ id: LATER_TASK_ID, title: `${LATER_HOUR}:00 從市府回家`, detail: `${LATER_HOUR} 點後出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${LATER_HOUR}:00–${LATER_HOUR}:30`, rewardCells: 12, rewardCredit: 0, reason: `${LATER_HOUR} 點後信義區叫車到上車約 ${later} 分` })
+      s.addTask({ id: LATER_TASK_ID, title: `${LATER_HOUR}:00 從市府回家`, detail: `${LATER_HOUR} 點後出發，一路點亮回家的路。`, kind: 'ride', poiId: 'home', window: `${LATER_HOUR}:00–${LATER_HOUR}:30`, rewardCells: 12, rewardCredit: 0, reason: `${LATER_HOUR} 點後信義區叫車到上車約 ${later} 分`, pinned: true })
       setFocusCard(LATER_TASK_ID)
       say(c, `好，${LATER_HOUR}:00 後再走，那時叫車到上車約 ${later} 分，搭了亮兩階。已放進今日任務最後一張。`)
       return
@@ -135,6 +138,12 @@ export function SpriteChat() {
             </div>
             {i === choiceAt && !busy && (
               <div className="chat-choices" role="group" aria-label="怎麼出發">
+                {i === 0 && (
+                  <p className="city-line">
+                    {cityLine}
+                    <span className="demo-mini">示範</span>
+                  </p>
+                )}
                 {CHOICES.map((c) => (
                   <button key={c} className={c === '準時預約' ? 'btn-lamp' : 'btn-ghost'} onClick={() => choose(c)}>
                     {c}

@@ -172,6 +172,39 @@ export function OpsView() {
         </div>
       </label>
 
+      <section className="card offpeak-card" aria-label="錯峰點燈">
+        <div className="card-head">
+          <strong>錯峰點燈</strong>
+          <span className="demo-tag">示範＋試算</span>
+        </div>
+        <p className="small offpeak-line">不發優惠券，用光讓人錯峰。</p>
+        <div className="kpis kpis-2">
+          <div>
+            <b>312 人</b>
+            <span className="tiny muted">今天錯峰（示範）</span>
+          </div>
+          <div>
+            <b>-6%</b>
+            <span className="tiny muted">18 點叫車（示範）</span>
+          </div>
+          <div>
+            <b>NT$0.6</b>
+            <span className="tiny muted">每趟 Points 成本（試算）</span>
+          </div>
+          <div>
+            <b>NT$26.6</b>
+            <span className="tiny muted">每趟派遣費（試算）</span>
+          </div>
+        </div>
+        <p className="reason small">信義區平日等超過 10 分鐘：18 點 25%、19 點 11%（2026/2–4 競賽資料彙總）。避開尖峰一小時，等車就少很多。</p>
+        <ul className="offpeak-rules small">
+          <li>獎勵：錯峰的路線亮兩階；每 20 格錯峰之光換 1 點和泰 Points，每人每月上限 20 點，由和泰集團 Points 行銷預算支應</li>
+          <li>防洗：只算完成的行程，同一格一天只算一次</li>
+          <li>驗證：三組對照（只有光／光＋Points／都沒有）</li>
+        </ul>
+        <p className="muted tiny">試算：一趟錯峰約 12 格 ÷ 20 格／點 × NT$1 ≈ NT$0.6；派遣費 NT$266 × 10% ≈ NT$26.6。正式版用 yoxi 自己的行程紀錄判斷是否錯峰，點燈足跡仍只存在手機；原型用模擬行程。</p>
+      </section>
+
       <section className="card">
         <div className="card-head">
           <strong>下一週需求預測（{district}）</strong>
