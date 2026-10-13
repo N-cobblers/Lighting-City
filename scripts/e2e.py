@@ -70,6 +70,8 @@ def main():
         log = page.locator('.chat-log').inner_text()
         if '叫車到上車' not in log:
             failures.append('小精靈第一句沒有叫車預報：' + log.replace('\n', ' ')[:120])
+        if '八成' not in log or 'LightGBM' not in log:
+            failures.append('預報沒有顯示 LightGBM 的八成區間：' + log.replace('\n', ' ')[:160])
         if '312' not in log and '128' not in log:
             failures.append('預報旁沒有城市層級的錯峰人數：' + log.replace('\n', ' ')[:160])
         shot(page, 'm1_forecast')
@@ -147,6 +149,26 @@ def main():
         if '揪團' in page.locator('.friends-view').inner_text():
             failures.append('好友頁還有揪團卡')
 
+        # 小精靈會用工具：沒有 Gemini 時用關鍵字判斷，照樣呼叫查預報、排錯峰（排錯峰要按確認）
+        tab('小精靈')
+        page.wait_for_timeout(1200)
+        page.locator('#chat-input').fill('明天 8 點從公司叫車好叫嗎？')
+        page.locator('#chat-input').press('Enter')
+        page.wait_for_timeout(1500)
+        log = page.locator('.chat-log').inner_text()
+        if '八成在' not in log or '查預報' not in log:
+            failures.append('小精靈沒有用「查預報」工具回答：' + log.replace('\n', ' ')[-160:])
+        page.get_by_role('button', name='幫我避開尖峰').click()
+        page.wait_for_timeout(1500)
+        if page.locator('.proposal').count() == 0:
+            failures.append('「幫我避開尖峰」沒有出現錯峰提案的確認卡')
+        else:
+            shot(page, 'c4_tools')
+            page.get_by_role('button', name='確認排進任務').click()
+            page.wait_for_timeout(800)
+            if '已排進' not in page.locator('.chat-log').inner_text():
+                failures.append('按確認後小精靈沒有說已排進任務')
+
         page.get_by_role('button', name='營運', exact=True).click()
         page.wait_for_timeout(9000)
         card = page.locator('.offpeak-card')
@@ -156,6 +178,13 @@ def main():
             card.scroll_into_view_if_needed()
             page.wait_for_timeout(500)
             shot(page, '07b_ops_offpeak')
+        mc = page.locator('.model-card')
+        if mc.count() == 0 or '回測' not in mc.inner_text():
+            failures.append('營運頁沒有「模型與系統」卡')
+        else:
+            mc.scroll_into_view_if_needed()
+            page.wait_for_timeout(500)
+            shot(page, '07c_model')
         page.get_by_role('button', name='設計空車時段任務').click()
         page.wait_for_timeout(3000)
         shot(page, '07_ops')

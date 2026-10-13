@@ -310,9 +310,10 @@ export function MapView() {
   }, [])
 
   // tasks
-  const regenerate = useCallback(async () => {
+  // 換時段時先用當天的任務快取；按「重新生成」才強制再問一次 Gemini
+  const regenerate = useCallback(async (force = false) => {
     setGenBusy(true)
-    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS })
+    const r = await generateTasks(s.settings, { now: s.now, slot, weather: s.weather, lucky: s.lucky, litPct: s.litPct, lowWindows: LOW_WINDOWS }, { force })
     s.setTasks(r.tasks, r.greeting, r.source)
     setGenBusy(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -603,7 +604,7 @@ export function MapView() {
                 <strong>今日 AI 任務・{SLOT_LABEL[slot]}</strong>
                 <span className="muted">{genBusy ? '小精靈正在依天氣、常用地點與空車低谷排任務…' : s.greeting || '　'}</span>
               </div>
-              <button className="btn-ghost" onClick={regenerate} disabled={genBusy} aria-label="重新生成任務">
+              <button className="btn-ghost" onClick={() => regenerate(true)} disabled={genBusy} aria-label="重新生成任務">
                 {genBusy ? '生成中' : '重新生成'}
               </button>
             </div>

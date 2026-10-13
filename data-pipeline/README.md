@@ -17,6 +17,8 @@ data-pipeline/
     yoxi_pickup_spots.csv   全台 yoxi 指定上車點與座標中位數
     demo/demand_xinyi_songshan.json   App 用的彙總指數（複製到 src/data/demand.json）
     bigquery/               BigQuery 用逐時表與 SQL
+    wait_model/             等車預測（LightGBM）：wait_forecast.json（App 用）、model_card.json（回測與特徵重要性）
+  data/external/weather_taipei_2026.json   Open-Meteo 歷史天氣（公開資料，14 號腳本用；沒有會自動下載）
     routes/                 雙北路段流量（每時段 ≥ 10 趟）、繞路比與壅塞係數
   data/osrm/                OpenStreetMap 路網與 OSRM 處理檔（不進版控）
 ```
@@ -35,7 +37,10 @@ python scripts/04_forecast.py          # 預測與驗證 → forecast_results.js
 python scripts/05_export.py            # BigQuery 表、demo 指數、上車點
 python scripts/06_compact.py           # （選用）精簡版逐筆資料 yoxi_trips_clean.parquet
 python scripts/07_report_charts.py     # 資料分析報告的圖 → ../docs/data-analysis/*.png
+python scripts/14_wait_model.py        # 等車時間預測（LightGBM）與 4 週回測 → data/processed/wait_model/（約 1 分鐘）
 cp data/processed/demo/demand_xinyi_songshan.json ../src/data/demand.json
+cp data/processed/wait_model/wait_forecast.json ../src/data/wait_forecast.json
+cp data/processed/wait_model/model_card.json ../src/data/wait_model_card.json
 ```
 
 整套約 1 分鐘。

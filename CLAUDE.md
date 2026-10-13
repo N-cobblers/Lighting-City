@@ -81,14 +81,16 @@ src/
   lib/store.tsx         全域狀態（React context）：設定、模擬時間、天氣、點亮格子、任務、圖鑑、分頁
   lib/settings.ts       設定型別與 localStorage 讀寫（Firebase 設定、App Check、模型、房間、幸運數字覆寫…）
   lib/firebase.ts       Firebase 初始化（設定字串或 Hosting 的 /__/firebase/init.json）、App Check、匿名登入
-  lib/ai.ts             Gemini：今日任務（結構化 JSON）、小精靈對話（串流）、拍車台詞、營運派任務；全部有示範資料備援
+  lib/ai.ts             Gemini：今日任務（結構化 JSON，當天同時段同天氣快取）、小精靈對話（function calling 用 tools.ts 的工具）、拍車台詞、營運派任務；全部有示範資料備援，並記錄回應時間
   lib/geo.ts            H3（第 9 級）、遊戲範圍、POI（yoxi 上車點座標來自競賽資料）、示範路線與取樣
   lib/ocr.ts            PP-OCRv4 辨識模型 + ONNX Runtime Web，只做單行辨識（取景框已框住車牌）
   lib/lucky.ts          今日幸運數字、車牌解析、雜湊比對示範車隊、小精靈配色
   lib/sprite3d.ts       three.js 車燈小精靈（相機畫面上跳出動畫）與 GLB 匯出
   lib/social.ts         Firestore 好友排行 rooms/{room}-{日期}/players/{uid}
   lib/weather.ts        氣象署 F-C0032-001 與「傍晚下雨」情境
-  lib/forecast.ts       小精靈的「你的下一趟」叫車預報（demand.json 信義區各星期幾逐時等車中位數）
+  lib/forecast.ts       叫車預報：讀 data/wait_forecast.json（LightGBM 逐時等車中位數、八成區間、等超過 10 分鐘機率；晴天／下雨兩種情境）
+  lib/tools.ts          小精靈的工具：查預報、查進度、排錯峰（只提案，玩家按確認才加任務卡）
+  lib/intent.ts         Gemini 連不上時用關鍵字判斷意圖（時段、地點），呼叫同一組工具
   lib/phase.ts          一天四個時段（早晨、白天、黃昏、夜晚）：各時段的地圖底圖、點亮格子與軌跡顏色
   lib/offpeak.ts        錯峰點燈：是否算錯峰、錯峰之光換和泰 Points（每 20 格 1 點、每月上限 20 點、同一格一天一次）、3 天內閃爍的格子
   views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap，依時段換底圖，失敗改離線底圖）、亮度圖例、搭車點亮動畫、任務卡輪播（不搭車的在前）、錯峰點燈（亮兩階、閃爍的錯峰之光、換到 Points 時小精靈跳出來）
@@ -96,8 +98,9 @@ src/
   views/SpriteChat.tsx  小精靈對話；第一句是叫車預報，附「準時預約／晚點走／現在走」與城市層級的錯峰人數（示範）
   views/SpriteAvatar.tsx 2D 小精靈頭像；玩家自己的小精靈依時段換表情與配色（早晨睡眼、黃昏圍巾、夜晚星星眼）
   views/FriendsView.tsx 幸運數字、好友排行、圖鑑
-  views/OpsView.tsx     營運（頂欄「營運」進入的全螢幕頁，不放在乘客分頁）：需求熱度地圖、低谷時段、錯峰點燈卡（等車差距、每趟 Points 成本對比派遣費）、下一週預測、AI 派任務
+  views/OpsView.tsx     營運（頂欄「營運」進入的全螢幕頁，不放在乘客分頁）：需求熱度地圖、低谷時段、錯峰點燈卡（等車差距、每趟 Points 成本對比派遣費）、模型與系統卡（回測、特徵重要性、Gemini 回應時間與成本）、下一週預測、AI 派任務
   data/demand.json      由 data-pipeline 匯出的彙總指數（0–100），不含個別行程
+  data/wait_forecast.json、wait_model_card.json  data-pipeline/scripts/14_wait_model.py 匯出的等車預測與回測結果（彙總）
   data/demo.ts          虛構示範玩家「小涵」、各時段示範任務與對話
   data/districts.json   台北市與部分新北市行政區界（離線底圖）
 public/models/          PP-OCRv4 辨識模型（10.8 MB）與字典
@@ -126,7 +129,7 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 ## 資料與隱私（嚴格遵守）
 
 - yoxi 競賽資料（約 96.5 萬筆行程，2026/2/1–4/30）含乘客編號與精確座標，**不得**放進 `src/`、`public/`、`dist/` 或任何會公開的地方，也不要 commit 原始或清理後的逐筆資料。
-- App 只能放彙總後的 0–100 指數（`src/data/demand.json`）。
+- App 只能放彙總後的資料：0–100 指數（`src/data/demand.json`）與模型預測（`src/data/wait_forecast.json`，每個地點×星期×小時的分鐘數與機率）。模型在 data-pipeline 本機訓練，競賽資料不上雲。
 - 原始 7z 放 `data-pipeline/data/raw/`，解壓到 `data-pipeline/data/extracted/`；逐筆中間檔（`raw_df.pkl`、`*.parquet`）都已列在 `.gitignore`。`data-pipeline/data/processed/` 裡的 JSON／CSV 是彙總結果，可以保留。
 - 人物「小涵」、示範車牌（TDX-3963、TDX-5528、TDX-1832、TDX-7708；ABC-1234 為非車隊）都是虛構的，畫面要保留「黑客松原型」標籤。
 
@@ -137,6 +140,7 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 - 搭 5 次以上的乘客（34%）貢獻 83% 行程；其上下車點中位數 58% 集中在 2 個 H3 格、48% 行程在同一個 3 小時。
 - 叫車到上車中位數 5.9 分鐘，平日尖峰拉長到 6.5–7.2 分鐘；信義區平日低谷 11–12、14–15、20 點，松山區 11–16、20 點。
 - 隔日逐時預測 WAPE：雙北 6.7%（基準 7.7%）、信義 16.4%（19.8%）、松山 15.5%（19.7%）。
+- 等車預測（LightGBM，`data-pipeline/scripts/14_wait_model.py`）4 週滾動回測：逐時等車中位數誤差行政區 0.60 分（現行作法「近 4 週同星期同時段中位數」0.66 分，少 8.1%）、平日尖峰 0.74 分（0.79，少 6.1%）、熱門上車格 1.41 分（1.67，少 15.9%）；八成區間實際涵蓋 78%；影響最大的特徵是所在行政區的等車水準、時段、近 4 週同時段等車。
 - 雙北路線（起訖歸到 H3 第 9 級、本機 OSRM 推估最快路線，`data-pipeline/data/processed/routes/`）：前 10% 路段承載 76% 行駛量；主走廊為忠孝東西路、建國高架、中山高、基隆路；平日低谷時通勤幹道流量剩尖峰約 7 成，忠孝東路一到四段持平；同一段路 10 點出發比 17 點少花約 22% 時間；看不出系統性繞路（繞路比中位數 0.98）。
 
 ## 程式注意事項

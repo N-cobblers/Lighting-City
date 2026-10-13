@@ -154,6 +154,8 @@ type Store = {
   recordOffpeak: (cells: string[]) => { counted: number; newPoints: number; light: number }
   /** 3 天內錯峰點亮、地圖上要閃爍的格子 */
   shimmer: string[]
+  /** 本月錯峰之光與和泰 Points（給小精靈的「查進度」工具） */
+  offpeakSummary: { light: number; points: number }
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -335,6 +337,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     markForecastSeen: setForecastSeenKey,
     recordOffpeak,
     shimmer,
+    offpeakSummary: { light: offpeak.light, points: offpeak.points },
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
