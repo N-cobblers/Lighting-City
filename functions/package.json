@@ -1,0 +1,26 @@
+{
+  "name": "yoxi-lighting-city-functions",
+  "private": true,
+  "description": "錯峰點燈後端：用行程紀錄判斷錯峰、Points 帳本、去識別化的城市彙總",
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run test/unit",
+    "test:emulator": "npm run build && firebase emulators:exec --only auth,firestore,functions --project demo-lighting-city \"vitest run test/emulator --no-file-parallelism\""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0",
+    "firebase-tools": "^15.33.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
