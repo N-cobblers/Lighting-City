@@ -93,7 +93,7 @@ src/
   lib/lucky.ts          今日幸運數字、車牌解析、雜湊比對示範車隊、小精靈配色
   lib/sprite3d.ts       three.js 車燈小精靈（相機畫面上跳出動畫）與 GLB 匯出
   lib/social.ts         Firestore 好友排行 rooms/{room}-{日期}/players/{uid}
-  lib/weather.ts        氣象署 F-C0032-001 與「傍晚下雨」情境
+  lib/weather.ts        氣象署 F-C0032-001，與「傍晚下雨」「晴天」兩個示範情境（錄錯峰點燈用晴天：下雨時 19 點也難叫，晚點走的差距出不來；小涵的示範任務跟著天氣換）
   lib/forecast.ts       叫車預報：讀 data/wait_forecast.json（LightGBM 逐時等車中位數、八成區間、等超過 10 分鐘機率；晴天／下雨兩種情境）
   lib/tools.ts          小精靈的工具：查預報、查進度、排錯峰（只提案，玩家按確認才加任務卡；回家卡照目前人物的家）
   lib/homeTask.ts       「晚點走」「準時預約」回家卡（從市府出發，回家／回板橋／回淡水），小精靈、工具、示範任務共用

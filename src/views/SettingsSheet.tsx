@@ -72,6 +72,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <span>天氣來源</span>
           <select id="wm" className="input" value={d.weatherMode} onChange={(e) => set({ weatherMode: e.target.value as Settings['weatherMode'] })}>
             <option value="rain">示範情境：傍晚下雨</option>
+            <option value="clear">示範情境：晴天</option>
             <option value="live">氣象署即時資料</option>
           </select>
         </label>

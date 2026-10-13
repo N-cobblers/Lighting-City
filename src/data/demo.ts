@@ -205,6 +205,14 @@ const walk = (id: string, title: string, detail: string, poiId: string, window: 
 const scan = (id: string): Task => ({ id, title: '找到一台 yoxi 車', detail: '在市府路上車點附近，拍一台停妥的 yoxi 車。', kind: 'scan', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區熱門的 yoxi 上車點' })
 const dinner = (id: string) => walk(id, '晚點走前先吃晚餐', '到捷運市政府站一帶吃晚餐，順便點亮一格。', 'mrt-cityhall', '18:00–19:00', '18 點是尖峰，先吃飯再走剛好')
 
+/** 小涵在傍晚不下雨的日子：開場白不提下雨，也不排 18 點前後的回家車（要不要晚點走，由小精靈的預報決定）。 */
+const HAN_CLEAR: Record<Slot, { greeting: string; drop: string[]; add: Task[] }> = {
+  morning: { greeting: '早安小涵！今晚 18 點市府比較難叫，我先幫你排好三個任務。', drop: ['f-m3'], add: [scan('f-m3c')] },
+  lunch: { greeting: '午休時間！走一小段路就能點亮新的一格。', drop: [], add: [] },
+  afternoon: { greeting: '下午好！現在附近空車多，是出門的好時機。', drop: ['f-a3'], add: [] },
+  evening: { greeting: '現在正是尖峰，先吃個飯，19:00 再走會快很多。', drop: ['f-e1'], add: [] },
+}
+
 /** 阿哲、小雅的示範任務：不搭車的排前面，最後一張是早上就排好的「晚點走」回家卡。 */
 const OTHER_TASKS: Record<string, SlotTasks> = {
   'a-zhe': {
@@ -233,7 +241,9 @@ export function getFallbackTasks(slot: Slot, personaId?: string | null, now = ne
   const other = OTHER_TASKS[persona.id]
   if (!other) {
     const f = FALLBACK_TASKS[slot]
-    return { greeting: f.greeting, tasks: f.tasks.map((t) => ({ ...t })) }
+    if (rain) return { greeting: f.greeting, tasks: f.tasks.map((t) => ({ ...t })) }
+    const c = HAN_CLEAR[slot]
+    return { greeting: c.greeting, tasks: [...f.tasks.filter((t) => !c.drop.includes(t.id)), ...c.add].map((t) => ({ ...t })) }
   }
   const f = other[slot]
   return { greeting: f.greeting, tasks: [...f.tasks.map((t) => ({ ...t })), laterHomeTask(persona.homeCard, now, undefined, rain)] }

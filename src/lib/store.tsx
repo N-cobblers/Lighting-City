@@ -5,7 +5,7 @@ import type { Collected, Source, Task, Weather } from './types'
 import { RES, cellAt, cellsInBox, poiById, routeById, routeCells } from './geo'
 import { PERSONA, getDemoPersona, slotOf, type DemoPersona } from '../data/demo'
 import { luckyNumber } from './lucky'
-import { fetchCwa, rainScenario } from './weather'
+import { clearScenario, fetchCwa, rainScenario } from './weather'
 import { phaseOf, type Phase } from './phase'
 import { applyOffpeak, emptyOffpeak, liveShimmer, sanitizeOffpeak, type OffpeakState } from './offpeak'
 import demand from '../data/demand.json'
@@ -235,7 +235,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setWeather({ ...fallback, note: `氣象署資料讀取失敗（${e.message}），改用示範情境` })
         })
     } else {
-      setWeather(rainScenario(new Date()))
+      setWeather(settings.weatherMode === 'clear' ? clearScenario(new Date()) : rainScenario(new Date()))
     }
     return () => {
       cancelled = true

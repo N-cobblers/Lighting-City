@@ -45,6 +45,15 @@ describe('三位示範人物', () => {
     expect(runTool('propose_offpeak', {}, { ...ctx, home: zhe.homeCard }).proposal?.task.title).toBe('19:00 從市府回板橋')
   })
 
+  it('小涵的示範任務跟著天氣：傍晚不下雨時不提下雨、也不排 18 點的回家車', () => {
+    for (const slot of SLOTS) {
+      const clear = getFallbackTasks(slot, 'xiao-han', tue, false)
+      expect(`${clear.greeting}${clear.tasks.map((t) => t.title + t.detail + t.reason).join('')}`, slot).not.toMatch(/雨/)
+      expect(clear.tasks.some((t) => /18:10|17:30–18:30/.test(`${t.detail}${t.window}`)), slot).toBe(false)
+    }
+    expect(getFallbackTasks('morning', 'xiao-han', tue, true).greeting).toMatch(/雨/)
+  })
+
   it('示範對話講到回家時，說的是目前人物的家', () => {
     expect(FALLBACK_CHAT.some((f) => f.reply.includes('{home}'))).toBe(true)
     expect(fallbackChatReply('幫我叫車回家', 'xiao-han')).toContain('民生社區')
