@@ -4,9 +4,9 @@ import { cellToBoundary, cellToChildren, gridDisk, getResolution, latLngToCell, 
 export const RES = 10
 export type LngLat = [number, number]
 
-/** 信義區＋松山區 play area (lat/lng box). */
-export const AREA = { south: 25.024, north: 25.066, west: 121.543, east: 121.588 }
-export const CENTER: LngLat = [121.5625, 25.0445]
+/** 雙北 demo 範圍：涵蓋信義／松山、板橋／新店與淡水一帶，讓地圖從單一通勤走廊擴大到更像城市級互動場景。 */
+export const AREA = { south: 24.95, north: 25.18, west: 121.42, east: 121.68 }
+export const CENTER: LngLat = [121.55, 25.09]
 
 export const AREA_CELLS: string[] = polygonToCells(
   [
@@ -30,9 +30,13 @@ export const POIS: Poi[] = [
   { id: 'spot-songyan', name: '松山文創園區誠品行旅 yoxi 上車點', lng: 121.561707, lat: 25.044983, kind: 'yoxi' },
   { id: 'spot-dome', name: '大巨蛋 yoxi 上車點（光復南路側）', lng: 121.557935, lat: 25.044363, kind: 'yoxi' },
   { id: 'spot-airport', name: '松山機場 yoxi 上車點', lng: 121.550726, lat: 25.062422, kind: 'yoxi' },
+  { id: 'spot-banciao', name: '板橋府中路 yoxi 上車點', lng: 121.4578, lat: 25.0128, kind: 'yoxi' },
+  { id: 'spot-tamsui', name: '淡水漁人碼頭 yoxi 上車點', lng: 121.4453, lat: 25.1713, kind: 'yoxi' },
   { id: 'sunyatsen', name: '國父紀念館', lng: 121.5602, lat: 25.0400, kind: 'place' },
   { id: 'songyan', name: '松山文創園區', lng: 121.5606, lat: 25.0438, kind: 'place' },
   { id: 'sisinan', name: '四四南村', lng: 121.5620, lat: 25.0314, kind: 'place' },
+  { id: 'banciao', name: '板橋車站', lng: 121.4584, lat: 25.0132, kind: 'place' },
+  { id: 'tamsui', name: '淡水老街', lng: 121.4458, lat: 25.1699, kind: 'place' },
   { id: 'xiangshan', name: '象山步道入口', lng: 121.5707, lat: 25.0277, kind: 'place' },
   { id: 'raohe', name: '饒河街夜市', lng: 121.5776, lat: 25.0507, kind: 'place' },
   { id: 'fujin', name: '富錦街', lng: 121.5630, lat: 25.0610, kind: 'place' },
@@ -170,6 +174,38 @@ ROUTES.push(
       [121.5520, 25.0581],
       [121.5520, 25.0610],
       [121.550726, 25.062422],
+    ],
+  },
+  {
+    id: 'banciao-commute',
+    name: '板橋到市府通勤',
+    from: 'banciao',
+    to: 'spot-cityhall',
+    minutes: 28,
+    path: [
+      [121.4584, 25.0132],
+      [121.4601, 25.0145],
+      [121.4660, 25.0185],
+      [121.4760, 25.0245],
+      [121.4900, 25.0300],
+      [121.5130, 25.0330],
+      [121.5350, 25.0350],
+      [121.5480, 25.0370],
+      [121.563634, 25.037566],
+    ],
+  },
+  {
+    id: 'tamsui-evening',
+    name: '淡水河岸散步',
+    from: 'tamsui',
+    to: 'spot-tamsui',
+    minutes: 12,
+    path: [
+      [121.4458, 25.1699],
+      [121.4470, 25.1670],
+      [121.4490, 25.1600],
+      [121.4515, 25.1520],
+      [121.4453, 25.1713],
     ],
   },
 )

@@ -96,7 +96,7 @@ export function MapView() {
       addLayers(map)
     })
     map.once('idle', () => {
-      const b = new maplibregl.LngLatBounds([121.5495, 25.0275], [121.5785, 25.0630])
+      const b = new maplibregl.LngLatBounds([121.42, 24.95], [121.68, 25.18])
       map.fitBounds(b, { padding: { top: 70, bottom: sheetPad() + 10, left: 24, right: 24 }, duration: 0 })
     })
     map.on('error', (e: any) => {
