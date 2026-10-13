@@ -72,6 +72,7 @@ python scripts/make_fixtures.py      # 示範車牌 PNG/PDF、假相機影片（
 python scripts/e2e.py                 # 需先 build + preview；截圖在 scripts/output/
 python scripts/ocr_check.py           # 用 onnxruntime 檢查車牌辨識模型
 python scripts/export_glb.py          # 需先 npm run dev；重新匯出 AR 用的小精靈 GLB
+python scripts/video/sprite/render_sprite.py preview|actions   # 小精靈設計預覽圖；影片用的動畫 PNG 序列（pop、hello、fly、point、cheer、bye、idle）
 
 # 3 分鐘影片：自動錄 App、開場結尾地圖、旁白（edge-tts）、合成（ffmpeg），步驟見 scripts/video/README.md
 python scripts/video/compose.py all
@@ -93,8 +94,10 @@ src/
   lib/ai.ts             Gemini：今日任務（結構化 JSON，當天同時段同天氣快取）、小精靈對話（function calling 用 tools.ts 的工具）、拍車台詞、營運派任務；全部有示範資料備援，並記錄回應時間
   lib/geo.ts            H3（個人地圖第 10 級）、雙北遊戲範圍、POI（yoxi 上車點座標來自競賽資料；板橋、淡水與三人的家是公開地標概略座標）、示範路線與取樣；板橋、淡水等長途與 road-<poiId> 路線是 OSRM 抓一次存成的靜態沿路路線（分鐘數＝OSRM 不塞車時間 × 1.5 ＋ 3 分鐘上車）
   lib/ocr.ts            PP-OCRv4 辨識模型 + ONNX Runtime Web，只做單行辨識（取景框已框住車牌）
-  lib/lucky.ts          今日幸運數字、車牌解析、雜湊比對示範車隊、小精靈配色
-  lib/sprite3d.ts       three.js 車燈小精靈（相機畫面上跳出動畫）與 GLB 匯出
+  lib/lucky.ts          今日幸運數字、車牌解析、雜湊比對示範車隊、小精靈光色（琥珀、暖黃、蜜桃、暖白、玫瑰金，依車牌加總 % 5；暖黃在索引 1，示範車牌 TDX-3963 拍到暖黃）
+  lib/sprite3d.ts       車燈小精靈的舞台：共用的打光與渲染設定、相機畫面上的跳出動畫、GLB 匯出（影片錄製也用同一套）
+  lib/spriteModel.ts    小精靈模型（車燈光球：發光核心與邊緣光、頭頂車燈 LED 光環、大眼睛有反光點與眼皮、可換嘴型、短手）與姿勢參數
+  lib/spriteActions.ts  小精靈動作時間軸（pop、hello、fly、point、cheer、bye、idle），spriteFx.ts 是閃光、光尾、光點特效
   lib/social.ts         Firestore 好友排行 rooms/{room}-{日期}/players/{uid}
   lib/weather.ts        氣象署 F-C0032-001，與「傍晚下雨」「晴天」兩個示範情境（錄錯峰點燈用晴天：下雨時 19 點也難叫，晚點走的差距出不來；小涵的示範任務跟著天氣換）
   lib/forecast.ts       叫車預報：讀 data/wait_forecast.json（LightGBM 逐時等車中位數、八成區間、等超過 10 分鐘機率；晴天／下雨兩種情境）
@@ -106,7 +109,7 @@ src/
   views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap，依時段換底圖，失敗改離線底圖）、亮度圖例、搭車點亮動畫、任務卡輪播（不搭車的在前）、錯峰點燈（亮兩階、閃爍的錯峰之光、換到 Points 時小精靈跳出來）
   views/ScanView.tsx    相機取景、辨識、小精靈、AR 召喚（model-viewer）
   views/SpriteChat.tsx  小精靈對話；第一句是叫車預報，附「準時預約／晚點走／現在走」與城市層級的錯峰人數（示範）
-  views/SpriteAvatar.tsx 2D 小精靈頭像；玩家自己的小精靈依時段換表情與配色（早晨睡眼、黃昏圍巾、夜晚星星眼）
+  views/SpriteAvatar.tsx 2D 小精靈頭像（和 3D 版同一個角色）；玩家自己的小精靈依時段換表情與配色（早晨睡眼、黃昏琥珀加圍巾、夜晚星星眼）
   views/FriendsView.tsx 幸運數字、好友排行、圖鑑
   views/OpsView.tsx     營運（頂欄「營運」進入的全螢幕頁，不放在乘客分頁）：需求熱度地圖、低谷時段、錯峰點燈卡（等車差距、每趟 Points 成本對比派遣費）、模型與系統卡（回測、特徵重要性、Gemini 回應時間與成本）、下一週預測、AI 派任務
   data/demand.json      由 data-pipeline 匯出的彙總指數（0–100），不含個別行程
@@ -114,7 +117,7 @@ src/
   data/demo.ts          虛構示範人物：小涵（主角，信義區上班族）、阿哲（板橋通勤族）、小雅（淡水週末旅遊者）；各人的足跡路線、生活圈、各時段示範任務與對話
   data/districts.json   台北市與部分新北市行政區界（離線底圖）
 public/models/          PP-OCRv4 辨識模型（10.8 MB）與字典
-public/sprites/         5 種配色的小精靈 GLB（AR 用，scripts/export_glb.py 產生）
+public/sprites/         5 種光色的小精靈 GLB（AR 用，scripts/export_glb.py 產生，順序同 lucky.ts）
 functions/              錯峰點燈後端：recordTrip（錯峰判斷、Points 帳本用行程編號防重複、每趟最多 2 點、每月上限、城市人數未滿 20 不公開）與模擬器測試
 .github/workflows/ci.yml  每個 PR 自動跑：App 建置與單元測試、Cloud Functions 模擬器測試、e2e
 data-pipeline/          yoxi 資料前處理、分析、預測（含 14 號 LightGBM 等車模型）、匯出（Python）與 BigQuery ML SQL
@@ -165,7 +168,7 @@ scripts/video/          3 分鐘方案說明影片的自動錄製與合成（旁
 - 拍車流程要先 `cropForOcr` 再停相機，否則會讀到黑畫面。
 - 換時段換底圖的保險只看新底圖的 `style.load` 有沒有來，不要用 `isStyleLoaded()`：搭車動畫每一格都在更新軌跡，那段時間它一直是 false，會誤判成底圖失敗。軌跡存在 ref 裡，換底圖重疊圖層時接著畫。
 - e2e 的假相機影片必須是直式（手機相機是直式；橫式影片在直式容器裡會被裁掉車牌）。
-- 視覺：一天分四個時段換色，劇本的 08:30、12:30、15:00、18:05 各落一段：早晨 5–10 點淺藍天空 `#DCEBFF`、白天 10–15 點明亮 `#F4F7FB`、黃昏 15–18 點紫色晚霞（`#6B4A7A`→`#2B2140`）、夜晚 18–5 點深藍夜色 `#0E1830`。車燈暖黃 `#FFC94A` 是按鈕與重點色，全天不變；早晨、白天的點亮格子改用琥珀橘系（淡黃在淺色底圖上看不見），黃昏、夜晚是暖黃光暈，越常去越接近白熱。配色變數在 `styles.css` 的 `:root[data-phase]`（App 依劇本時間設定 `<html data-phase>`，換時段時有 1 秒淡入淡出），底圖（OpenFreeMap positron／fiord／dark）與格子顏色在 `lib/phase.ts`。營運頁固定用夜晚配色。每個時段的文字對比都要至少 4.5:1（大字 3:1），改顏色後要重新檢查。字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo。
+- 視覺：一天分四個時段換色，劇本的 08:30、12:30、15:00、18:05 各落一段：早晨 5–10 點淺藍天空 `#DCEBFF`、白天 10–15 點明亮 `#F4F7FB`、黃昏 15–18 點紫色晚霞（`#6B4A7A`→`#2B2140`）、夜晚 18–5 點深藍夜色 `#0E1830`。車燈暖黃 `#FFC94A` 是按鈕與重點色，全天不變；早晨、白天的點亮格子改用琥珀橘系（淡黃在淺色底圖上看不見），黃昏、夜晚是暖黃光暈，越常去越接近白熱。配色變數在 `styles.css` 的 `:root[data-phase]`（App 依劇本時間設定 `<html data-phase>`，換時段時有 1 秒淡入淡出），底圖（OpenFreeMap positron／fiord／dark）與格子顏色在 `lib/phase.ts`。營運頁固定用夜晚配色。每個時段的文字對比都要至少 4.5:1（大字 3:1），改顏色後要重新檢查。字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo，也不要做成有臉的汽車或檯燈。小精靈光色只用車燈暖光（不用綠、藍、粉）；3D 用 Neutral 色調映射、曝光 0.72，太亮時橘色會被映射成粉色，身體也不要加 clearcoat、sheen（邊緣會變暗）。
 
 ## 下一步（建議順序）
 
