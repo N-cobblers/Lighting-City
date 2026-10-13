@@ -38,6 +38,8 @@ export function parsePlace(text: string): string | undefined {
 export function parseIntent(text: string): Intent | null {
   const t = text.replace(/\s/g, '')
   const hour = parseHour(t)
+  // 「錯峰之光還差多少」問的是進度，要比「錯峰」先判斷
+  if (/錯峰之光|進度|點亮多少|Points|點數/i.test(t)) return { name: 'get_progress', args: {} }
   if (/錯峰|避開|避峰|晚點走|幫我排|排一下|提早預約|不想等/.test(t)) {
     return { name: 'propose_offpeak', args: { mode: /提早預約|預約/.test(t) && !/晚點/.test(t) ? 'reserve' : 'later', ...(hour != null ? { hour } : {}) } }
   }
@@ -45,6 +47,6 @@ export function parseIntent(text: string): Intent | null {
     const day = /明天|明早|明晚/.test(t) ? 'tomorrow' : 'today'
     return { name: 'get_forecast', args: { day, ...(hour != null ? { hour } : {}), ...(parsePlace(t) ? { place: parsePlace(t) } : {}) } }
   }
-  if (/任務|進度|點亮多少|錯峰之光|Points|點數/i.test(t)) return { name: 'get_progress', args: {} }
+  if (/任務/.test(t)) return { name: 'get_progress', args: {} }
   return null
 }

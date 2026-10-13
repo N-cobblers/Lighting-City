@@ -59,6 +59,12 @@ npm install
 npm run dev                 # 開發（http://localhost:5173）
 npm run build               # tsc 型別檢查 + vite 建置到 dist/
 npm run preview -- --port 4173
+npm test                    # App 的單元測試（vitest：錯峰規則、意圖判斷、小精靈工具、預測資料）
+
+# 錯峰點燈後端（需要 Node 24.12 以上、Java 21 以上）
+cd functions && npm ci
+npm test                    # Cloud Functions 單元測試
+npm run test:emulator       # 啟動 auth、firestore、functions 模擬器，跑安全規則與 recordTrip 測試
 
 # 測試（Python 3.11+）
 pip install -r scripts/requirements.txt && python -m playwright install chromium
@@ -105,7 +111,9 @@ src/
   data/districts.json   台北市與部分新北市行政區界（離線底圖）
 public/models/          PP-OCRv4 辨識模型（10.8 MB）與字典
 public/sprites/         5 種配色的小精靈 GLB（AR 用，scripts/export_glb.py 產生）
-data-pipeline/          yoxi 資料前處理、分析、預測、匯出（Python）與 BigQuery ML SQL
+functions/              錯峰點燈後端：recordTrip（錯峰判斷、Points 帳本用行程編號防重複、每月上限、城市人數未滿 20 不公開）與模擬器測試
+.github/workflows/ci.yml  每個 PR 自動跑：App 建置與單元測試、Cloud Functions 模擬器測試、e2e
+data-pipeline/          yoxi 資料前處理、分析、預測（含 14 號 LightGBM 等車模型）、匯出（Python）與 BigQuery ML SQL
 docs/                   提案決策、研究報告、資料分析報告（data-analysis-report.md）、影片腳本、簡報原始檔、示範車牌
 ```
 
