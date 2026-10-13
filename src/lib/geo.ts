@@ -23,7 +23,9 @@ export type Poi = { id: string; name: string; lng: number; lat: number; kind: 'y
 
 /** yoxi 指定上車點座標取自競賽資料（該上車點所有上車座標的中位數）。其餘為公開地標的概略座標。 */
 export const POIS: Poi[] = [
-  { id: 'home', name: '家（民生社區）', lng: 121.5626, lat: 25.0586, kind: 'home' },
+  { id: 'home-xiao-han', name: '小涵的家（民生社區）', lng: 121.5626, lat: 25.0586, kind: 'home' },
+  { id: 'home-a-zhe', name: '阿哲的家（板橋新埔）', lng: 121.4668, lat: 25.0236, kind: 'home' },
+  { id: 'home-xiao-ya', name: '小雅的家（淡水老街）', lng: 121.4458, lat: 25.1699, kind: 'home' },
   { id: 'work', name: '公司（市府附近）', lng: 121.5652, lat: 25.0381, kind: 'work' },
   { id: 'spot-cityhall', name: '台北市府路 yoxi 上車點', lng: 121.563634, lat: 25.037566, kind: 'yoxi' },
   { id: 'spot-101', name: '台北101 yoxi 上車點（松智路）', lng: 121.565305, lat: 25.033383, kind: 'yoxi' },
@@ -52,7 +54,7 @@ export const ROUTES: Route[] = [
     id: 'evening-home',
     name: '下班回家',
     from: 'spot-cityhall',
-    to: 'home',
+    to: 'home-xiao-han',
     minutes: 13,
     path: [
       [121.563634, 25.037566],
@@ -89,7 +91,7 @@ export const ROUTES: Route[] = [
   {
     id: 'morning-work',
     name: '早上上班',
-    from: 'home',
+    from: 'home-xiao-han',
     to: 'spot-cityhall',
     minutes: 14,
     path: [
@@ -112,7 +114,7 @@ ROUTES.push(
   {
     id: 'commute-dunhua',
     name: '平常的通勤路線（敦化北路）',
-    from: 'home',
+    from: 'home-xiao-han',
     to: 'spot-cityhall',
     minutes: 16,
     path: [
@@ -131,7 +133,7 @@ ROUTES.push(
   {
     id: 'weekend-raohe',
     name: '週末去饒河街',
-    from: 'home',
+    from: 'home-xiao-han',
     to: 'raohe',
     minutes: 10,
     path: [
@@ -147,7 +149,7 @@ ROUTES.push(
   {
     id: 'weekend-xiangshan',
     name: '週末爬象山',
-    from: 'home',
+    from: 'home-xiao-han',
     to: 'xiangshan',
     minutes: 15,
     path: [

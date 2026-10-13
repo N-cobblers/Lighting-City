@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useStore, LOW_WINDOWS } from '../lib/store'
 import { AREA_CELLS, CENTER, POIS, cellAt, cellsFeatureCollection, interpolateAlong, lineFeature, neighbours, pathLengthKm, poiById, routeById, routeCells, samplePath, type LngLat, type Route } from '../lib/geo'
 import { generateTasks } from '../lib/ai'
-import { slotOf, SLOT_LABEL } from '../data/demo'
+import { DEMO_PERSONAS, getDemoPersona, slotOf, SLOT_LABEL } from '../data/demo'
 import type { Task } from '../lib/types'
 import districts from '../data/districts.json'
 import { SpriteAvatar } from './SpriteAvatar'
@@ -21,8 +21,23 @@ const FALLBACK_STYLE: StyleSpecification = {
   ],
 }
 
-function taskRoute(t: Task): Route {
-  if (t.poiId === 'home') return routeById('evening-home')
+function taskRoute(t: Task, personaId?: string): Route {
+  const persona = getDemoPersona(personaId)
+  if (t.poiId === 'home' || t.poiId === persona.home.poiId) {
+    const home = poiById(persona.home.poiId)!
+    if (persona.id === 'a-zhe') {
+      const commute = routeById('banciao-commute')
+      const path = [...commute.path].reverse()
+      path[path.length - 1] = [home.lng, home.lat]
+      return { ...commute, id: 'banciao-home', name: '下班回板橋新埔', from: commute.to, to: home.id, path }
+    }
+    if (persona.id === 'xiao-ya') {
+      const start = poiById('spot-cityhall')!
+      const path: LngLat[] = [[start.lng, start.lat], [121.52, 25.05], [121.49, 25.08], [121.46, 25.12], [home.lng, home.lat]]
+      return { id: 'tamsui-home', name: '下班回淡水', from: start.id, to: home.id, path, minutes: Math.round(pathLengthKm(path) * 3 + 3) }
+    }
+    return routeById('evening-home')
+  }
   if (t.poiId === 'spot-songyan' || t.poiId === 'songyan') return routeById('afternoon-songyan')
   if (t.poiId === 'work' || t.poiId === 'spot-cityhall') return routeById('morning-work')
   const from = poiById('spot-cityhall')!
@@ -56,6 +71,30 @@ export function MapView() {
     return Math.min(h * 0.6, sheetOpen ? sh : 118)
   }
   const slot = slotOf(s.now)
+  const persona = getDemoPersona(s.settings.demoPersonaId)
+  const personaRef = useRef(persona)
+  personaRef.current = persona
+
+  const focusHome = useCallback((map: MlMap, selectedPersona: typeof persona) => {
+    const target = poiById(selectedPersona.home.poiId) || poiById('home-xiao-han')
+    if (!target) return
+    box.current?.querySelectorAll<HTMLElement>('.poi[data-poi-id]').forEach((marker) => {
+      const poi = poiById(marker.dataset.poiId || '')
+      const homeOwner = DEMO_PERSONAS.find((candidate) => candidate.home.poiId === marker.dataset.poiId)
+      const isSelectedHome = marker.dataset.poiId === selectedPersona.home.poiId
+      marker.classList.toggle('poi-home', !!homeOwner)
+      marker.classList.toggle('poi-home-selected', isSelectedHome)
+      marker.classList.toggle('poi-place', poi?.kind === 'place' && !homeOwner)
+      marker.textContent = poi?.kind === 'work' ? '公司' : homeOwner ? `${homeOwner.name}家` : ''
+      if (homeOwner) marker.title = `${homeOwner.name}的家 · ${poi?.name || ''}`
+    })
+    map.flyTo({
+      center: [target.lng, target.lat],
+      zoom: selectedPersona.id === 'xiao-ya' || selectedPersona.id === 'a-zhe' ? 12.2 : 12.8,
+      duration: 1000,
+      padding: { top: 70, bottom: Math.min((box.current?.clientHeight || 700) * 0.6, (sheetRef.current?.getBoundingClientRect().height || 118) + 16), left: 24, right: 24 },
+    })
+  }, [])
 
   const addLayers = useCallback((map: MlMap) => {
     if (map.getSource('area')) return
@@ -96,8 +135,7 @@ export function MapView() {
       addLayers(map)
     })
     map.once('idle', () => {
-      const b = new maplibregl.LngLatBounds([121.42, 24.95], [121.68, 25.18])
-      map.fitBounds(b, { padding: { top: 70, bottom: sheetPad() + 10, left: 24, right: 24 }, duration: 0 })
+      focusHome(map, personaRef.current)
     })
     map.on('error', (e: any) => {
       const msg = String(e?.error?.message || '')
@@ -106,9 +144,12 @@ export function MapView() {
     // yoxi 上車點與地標
     for (const p of POIS) {
       const el = document.createElement('div')
+      const homeOwner = DEMO_PERSONAS.find((candidate) => candidate.home.poiId === p.id)
       el.className = `poi poi-${p.kind}`
+      el.dataset.poiId = p.id
       el.title = p.name
-      if (p.kind === 'home' || p.kind === 'work') el.textContent = p.kind === 'home' ? '家' : '公司'
+      if (p.kind === 'work') el.textContent = '公司'
+      else if (homeOwner) el.textContent = `${homeOwner.name}家`
       new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map)
     }
     const car = document.createElement('div')
@@ -120,7 +161,7 @@ export function MapView() {
       map.remove()
       mapRef.current = null
     }
-  }, [addLayers])
+  }, [addLayers, focusHome])
 
   // Keep the lit layer in sync with the footprint.
   useEffect(() => {
@@ -149,12 +190,18 @@ export function MapView() {
 
   const lastSlot = useRef<string>('')
   useEffect(() => {
-    const key = `${slot}-${s.weather.eveningPop}`
+    const key = `${slot}-${s.weather.eveningPop}-${s.settings.demoPersonaId}`
     if (lastSlot.current === key) return
     lastSlot.current = key
     regenerate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slot, s.weather.eveningPop])
+  }, [slot, s.weather.eveningPop, s.settings.demoPersonaId])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    focusHome(map, persona)
+  }, [persona.home.poiId, persona.id, focusHome])
 
   const ride = useCallback(
     async (route: Route, task?: Task) => {
@@ -215,7 +262,7 @@ export function MapView() {
     const id = s.pendingRide
     s.requestRide(null)
     const t = s.tasks.find((x) => x.id === id)
-    if (t) ride(taskRoute(t), t)
+    if (t) ride(taskRoute(t, s.settings.demoPersonaId), t)
     else ride(routeById(id) || routeById('evening-home'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pendingRide])

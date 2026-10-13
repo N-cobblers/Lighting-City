@@ -2,7 +2,7 @@ import { getFirebase } from './firebase'
 import type { Settings } from './settings'
 import type { Source, Task, Weather } from './types'
 import { POIS, poiById } from './geo'
-import { FALLBACK_CHAT, FALLBACK_CHAT_DEFAULT, FALLBACK_OPS, FALLBACK_TASKS, PERSONA, SLOT_LABEL, getDemoPersona, type Slot } from '../data/demo'
+import { FALLBACK_CHAT, FALLBACK_CHAT_DEFAULT, FALLBACK_OPS, PERSONA, SLOT_LABEL, getDemoPersona, getFallbackTasks, type Slot } from '../data/demo'
 
 export type AiStatus = { state: 'idle' | 'live' | 'demo' | 'error'; detail?: string }
 type Listener = (s: AiStatus) => void
@@ -73,7 +73,7 @@ const TASK_SYSTEM = `你是 yoxi 點燈城的任務設計師，也是住在 yoxi
 城市一開始是夜色，玩家搭 yoxi 會點亮整條路線，完成任務會點亮街區（H3 六角格）。
 請依情境為玩家設計今天的 3 個情境任務，規則：
 1. 至少 1 個任務不用搭車（kind = walk），在公司或住家附近步行就能完成。
-2. 傍晚降雨機率 60% 以上時，一定要有「下雨前預約 yoxi 回家」的任務（kind = ride，poiId = home）。
+2. 傍晚降雨機率 60% 以上時，一定要有回玩家住家的任務（kind = ride，poiId 必須使用玩家常用地點中的住家 poiId，任務文案要寫出住家地名）。
 3. 其他搭車任務排在「需求低谷時段」，rewardCredit 是只能在該時段折抵的乘車金（20–50 元），不在低谷的任務 rewardCredit = 0。
 4. poiId 只能從「可用地點」選。window 用「HH:MM–HH:MM」。
 5. 標題 14 字以內，detail 40 字以內，語氣溫暖、具體。reason 寫給營運人員看，說明為什麼這樣派，40 字以內，要提到資料依據（低谷時段、天氣或習慣）。
@@ -82,7 +82,7 @@ const TASK_SYSTEM = `你是 yoxi 點燈城的任務設計師，也是住在 yoxi
 
 export async function generateTasks(settings: Settings, ctx: AiContext): Promise<{ greeting: string; tasks: Task[]; source: Source }> {
   const fallback = () => {
-    const f = FALLBACK_TASKS[ctx.slot]
+    const f = getFallbackTasks(ctx.slot, ctx.demoPersonaId)
     return { greeting: f.greeting, tasks: f.tasks.map((t) => ({ ...t })), source: 'demo' as Source }
   }
   try {

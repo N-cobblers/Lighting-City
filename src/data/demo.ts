@@ -19,7 +19,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     name: '小涵',
     age: 27,
     role: '信義區上班族',
-    home: { poiId: 'home', label: '家（松山區民生社區）' },
+    home: { poiId: 'home-xiao-han', label: '家（松山區民生社區）' },
     work: { poiId: 'work', label: '公司（信義區市府附近）' },
     habits: [
       '平日 18:00–20:00 下班常叫 yoxi 回家（近 30 天 9 次，平常走敦化北路）',
@@ -54,7 +54,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     name: '阿哲',
     age: 34,
     role: '板橋通勤族',
-    home: { poiId: 'banciao', label: '家（板橋車站）' },
+    home: { poiId: 'home-a-zhe', label: '家（板橋新埔）' },
     work: { poiId: 'work', label: '公司（信義區市府附近）' },
     habits: [
       '週一到週五早晚通勤都走板橋到信義的主要幹線，低谷時段更容易回頭叫車',
@@ -84,7 +84,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     name: '小雅',
     age: 29,
     role: '淡水週末旅遊者',
-    home: { poiId: 'tamsui', label: '家（淡水老街）' },
+    home: { poiId: 'home-xiao-ya', label: '家（淡水老街）' },
     work: { poiId: 'spot-cityhall', label: '工作（市府附近）' },
     habits: [
       '工作日傍晚常從淡水出發到台北市區，會順路逛河岸步道與文創空間',
@@ -160,6 +160,57 @@ export const FALLBACK_TASKS: Record<Slot, { greeting: string; tasks: Task[] }> =
       { id: 'f-e3', title: '週末去饒河街夜市', detail: '週六 20 點後搭 yoxi 去饒河街，點亮松山東側。', kind: 'ride', poiId: 'raohe', window: '週六 20:00–21:00', rewardCells: 8, rewardCredit: 20, reason: '松山區平日與週末 20 點需求回落，等車短。' },
     ],
   },
+}
+
+const PERSONA_TASKS: Record<string, { afternoonPoi: string; afternoonTitle: string; afternoonDetail: string; homeTitle: string; homeLabel: string }> = {
+  'xiao-han': {
+    afternoonPoi: 'spot-songyan',
+    afternoonTitle: '下午搭 yoxi 去松菸',
+    afternoonDetail: '14–16 點搭 yoxi 去松菸，沿途點亮街區，乘車金折 30 元。',
+    homeTitle: '預約 yoxi 回民生社區',
+    homeLabel: '民生社區',
+  },
+  'a-zhe': {
+    afternoonPoi: 'spot-cityhall',
+    afternoonTitle: '下午搭 yoxi 去市府',
+    afternoonDetail: '14–16 點搭 yoxi 前往市府商圈，沿途點亮通勤路網，乘車金折 30 元。',
+    homeTitle: '預約 yoxi 回板橋',
+    homeLabel: '板橋新埔',
+  },
+  'xiao-ya': {
+    afternoonPoi: 'spot-tamsui',
+    afternoonTitle: '下午搭 yoxi 去淡水河岸',
+    afternoonDetail: '14–16 點搭 yoxi 去淡水漁人碼頭，沿途點亮河岸街區，乘車金折 30 元。',
+    homeTitle: '預約 yoxi 回淡水',
+    homeLabel: '淡水老街',
+  },
+}
+
+/** 依目前 demo 玩家調整目的地與回家任務，避免所有角色共用同一組示範路線。 */
+export function getFallbackTasks(slot: Slot, personaId?: string | null) {
+  const persona = getDemoPersona(personaId)
+  const config = PERSONA_TASKS[persona.id] || PERSONA_TASKS[PERSONA.id]
+  const fallback = FALLBACK_TASKS[slot]
+  const tasks = fallback.tasks.map((task) => {
+    if (task.id === 'f-m2' || task.id === 'f-l2' || task.id === 'f-a1') {
+      return { ...task, poiId: config.afternoonPoi, title: config.afternoonTitle, detail: config.afternoonDetail }
+    }
+    if (task.poiId === 'home') {
+      return {
+        ...task,
+        poiId: persona.home.poiId,
+        title: task.kind === 'group' ? `揪同事一起回${config.homeLabel}` : config.homeTitle,
+        detail: task.kind === 'group'
+          ? `同方向的同事一起搭，車資平分，一起點亮回${config.homeLabel}的路。`
+          : `18 點前預約 yoxi 回${config.homeLabel}，沿途點亮回家的路。`,
+      }
+    }
+    return { ...task }
+  })
+  return {
+    greeting: fallback.greeting.replace('小涵', persona.name),
+    tasks,
+  }
 }
 
 export const FALLBACK_CHAT: { match: RegExp; reply: string }[] = [
