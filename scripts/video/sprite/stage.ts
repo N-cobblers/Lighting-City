@@ -1,10 +1,11 @@
 /**
  * 小精靈動畫的錄製舞台（720×720、透明背景）。模型、動作、特效、打光都和 App 的拍車畫面共用（src/lib/sprite3d.ts）。
- * render_sprite.py 用 window.SPR.action(name, t) 一格一格畫，再截圖成 PNG 序列。
+ * render_sprite.py 用 window.SPR.action(name, t) 一格一格畫，再截圖成 PNG 序列；第三版影片的動作用 action3。
  */
 import * as THREE from 'three'
 import { createSpriteScene, prepareSpriteRenderer } from '../../../src/lib/sprite3d'
 import { ACTIONS, EXPRESSIONS, type Frame } from '../../../src/lib/spriteActions'
+import { ACTIONS_V3 } from '../../../src/lib/spriteActionsV3'
 import { createSpriteFx } from '../../../src/lib/spriteFx'
 import { buildSpriteRig, WARM, type Palette, type Pose, type SpriteRig } from '../../../src/lib/spriteModel'
 
@@ -39,10 +40,14 @@ declare global {
     SPR: {
       ready: boolean
       durations: Record<string, number>
+      durations3: Record<string, number>
       setPalette: (p: Palette) => void
       action: (name: string, t: number) => void
+      action3: (name: string, t: number) => void
       pose: (p: Partial<Pose>) => void
       expression: (name: string, extra?: Partial<Pose>) => void
+      /** 站好不動時，嘴巴中心在 720×720 畫布上的位置（像素） */
+      mouthScreen: () => [number, number]
     }
   }
 }
@@ -57,8 +62,15 @@ const draw = (f: Frame, t: number) => {
 window.SPR = {
   ready: true,
   durations: Object.fromEntries(Object.entries(ACTIONS).map(([k, v]) => [k, v.dur])),
+  durations3: Object.fromEntries(Object.entries(ACTIONS_V3).map(([k, v]) => [k, v.dur])),
   setPalette,
   action: (name, t) => draw(ACTIONS[name].frame(t), t),
+  action3: (name, t) => draw(ACTIONS_V3[name].frame(t), t),
   pose: (p) => draw({ ...EMPTY, pose: p }, 0),
   expression: (name, extra = {}) => draw({ ...EMPTY, pose: { ...EXPRESSIONS[name], ...extra } }, 0),
+  mouthScreen: () => {
+    // 嘴巴貼在球面 (0, -0.25) 的位置（見 spriteModel.ts 的 mouthPos）
+    const v = new THREE.Vector3(0, -0.25, Math.sqrt(1 - 0.0625)).project(camera)
+    return [Math.round(((v.x + 1) / 2) * SIZE), Math.round(((1 - v.y) / 2) * SIZE)]
+  },
 }

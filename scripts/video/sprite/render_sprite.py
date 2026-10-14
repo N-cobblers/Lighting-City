@@ -3,6 +3,8 @@
 用法（專案根目錄）：
   python scripts/video/sprite/render_sprite.py preview [輸出路徑]   # 預覽圖（正面、45 度、表情、動作關鍵格、五種光色）
   python scripts/video/sprite/render_sprite.py actions [動作 ...]   # PNG 序列 → scripts/video/out/sprite/<動作>/0001.png…
+  python scripts/video/sprite/render_sprite.py actions3 [動作 ...]  # 第三版影片：enter、talk_<表情>_<嘴型>、cheer、wave、bye → scripts/video/out/sprite3/
+  python scripts/video/sprite/render_sprite.py preview3 [輸出路徑]  # 第三版動作的預覽圖（關鍵格、同一格三種嘴型並排）
 """
 import asyncio
 import io
@@ -11,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 from playwright.async_api import async_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -59,18 +61,20 @@ async def shot(page) -> Image.Image:
     return Image.open(io.BytesIO(await page.screenshot(omit_background=True, type='png'))).convert('RGBA')
 
 
-async def actions(names):
+async def actions(names, v3=False):
+    out = OUT / 'sprite3' if v3 else SOUT
+    fn = 'action3' if v3 else 'action'
     async with async_playwright() as p:
         b, page = await open_page(p)
-        durs = await page.evaluate('window.SPR.durations')
+        durs = await page.evaluate('window.SPR.durations3' if v3 else 'window.SPR.durations')
         for name in names or list(durs):
-            d = SOUT / name
+            d = out / name
             if d.exists():
                 shutil.rmtree(d)
             d.mkdir(parents=True)
             n = round(durs[name] * FPS)
             for i in range(n):
-                await page.evaluate(f'window.SPR.action({name!r}, {i / FPS})')
+                await page.evaluate(f'window.SPR.{fn}({name!r}, {i / FPS})')
                 (await shot(page)).save(d / f'{i + 1:04d}.png', optimize=False, compress_level=3)
             print(f'{name}: {n} 格 → {d}')
         await b.close()
@@ -131,10 +135,64 @@ async def preview(out: Path):
     print('preview →', out)
 
 
+async def preview3(out: Path):
+    """第三版：每列一個動作的關鍵格；講話的四種表情各一列，同一格的三種嘴型並排（檢查身體是否逐格一樣）。"""
+    tile = 260
+    rows = []
+    async with async_playwright() as p:
+        b, page = await open_page(p)
+
+        async def at(name, t):
+            await page.evaluate(f'window.SPR.action3({name!r}, {t})')
+            return await shot(page)
+
+        mouth = await page.evaluate('window.SPR.mouthScreen()')
+        rows.append(('enter', [(f'enter {t:.2f}', await at('enter', t)) for t in (0.0, 0.14, 0.24, 0.4, 0.6, 0.74, 1.0)]))
+        diffs = {}
+        for e in ('happy', 'excited', 'worried', 'surprised'):
+            tiles = []
+            for t in (0.25, 0.75):
+                ims = [await at(f'talk_{e}_{lv}', t) for lv in (0, 1, 2)]
+                tiles += [(f'{e} {t:.2f} 嘴{lv}', im) for lv, im in zip((0, 1, 2), ims)]
+                # 三種嘴型只有嘴巴附近不同：找出有差異的範圍
+                box = ImageChops.difference(ims[0], ims[2]).convert('L').point(lambda v: 255 if v > 24 else 0).getbbox()
+                diffs[f'{e}@{t}'] = box
+            # 眨眼最閉的那一格（happy 本來就是笑眼，取 1.30）
+            tb = {'happy': 1.3, 'excited': 1.38, 'worried': 1.23, 'surprised': 1.56}[e]
+            tiles.append((f'{e} {tb:.2f} 眨眼', await at(f'talk_{e}_1', tb)))
+            rows.append((e, tiles))
+        rows.append(('cheer', [(f'cheer {t:.2f}', await at('cheer', t)) for t in (0.0, 0.18, 0.3, 0.48, 0.62, 0.92, 1.26)]))
+        rows.append(('wave/bye', [(f'wave {t:.2f}', await at('wave', t)) for t in (0.0, 0.5, 1.0)] + [(f'bye {t:.2f}', await at('bye', t)) for t in (1.25, 1.45, 1.65, 1.8)]))
+        await b.close()
+    W, cols = tile * 7, 7
+    H = len(rows) * (tile + 30) + 60
+    img = Image.new('RGB', (W, H), '#1A2340')
+    d = ImageDraw.Draw(img)
+    d.text((16, 14), f'車燈小精靈・第三版動作預覽（嘴巴中心約在 {mouth}，720 畫布）', fill='#F6F1E3', font=font(22))
+    y = 60
+    for _, tiles in rows:
+        for i, (label, im) in enumerate(tiles[:cols]):
+            cell = Image.new('RGBA', (tile, tile), '#0E1830')
+            cell.alpha_composite(im.resize((tile, tile), Image.LANCZOS))
+            img.paste(cell.convert('RGB'), (i * tile, y))
+            d.text((i * tile + 6, y + tile + 3), label, fill='#F6F1E3', font=font(17))
+        y += tile + 30
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, quality=92)
+    print('preview3 →', out)
+    print('mouth center (720 canvas):', mouth)
+    for k, v in diffs.items():
+        print('  mouth-variant diff bbox', k, v)
+
+
 if __name__ == '__main__':
     bundle()
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'preview'
     if cmd == 'preview':
         asyncio.run(preview(Path(sys.argv[2]) if len(sys.argv) > 2 else SOUT / 'preview.jpg'))
+    elif cmd == 'preview3':
+        asyncio.run(preview3(Path(sys.argv[2]) if len(sys.argv) > 2 else OUT / 'sprite3' / 'preview.jpg'))
+    elif cmd == 'actions3':
+        asyncio.run(actions(sys.argv[2:], v3=True))
     else:
         asyncio.run(actions(sys.argv[2:]))

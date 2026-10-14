@@ -2,7 +2,7 @@
 
 /** 車燈小精靈的光色：body 身體、glow 發光、rim 邊緣與手。 */
 export type Palette = { name: string; body: string; glow: string; rim: string }
-export type Mouth = 'smile' | 'open' | 'o' | 'grin'
+export type Mouth = 'smile' | 'open' | 'o' | 'grin' | 'frown'
 
 export const WARM: Palette = { name: '暖黃', body: '#FFD452', glow: '#FFC83D', rim: '#EFA52E' }
 
@@ -31,6 +31,14 @@ export type Pose = {
   lookY: number
   mouth: Mouth
   mouthOpen: number
+  /** 嘴巴寬度倍率（1 = 原本） */
+  mouthW: number
+  /** 眉毛：0 不顯示、1 顯示；browTilt 正值 = 內側上揚（擔心），browY = 往上抬（驚訝） */
+  brow: number
+  browTilt: number
+  browY: number
+  /** 眼睛反光點的大小倍率（亮晶晶） */
+  shine: number
   /** 頭頂光環 */
   ringX: number
   ringY: number
@@ -45,7 +53,7 @@ export type Pose = {
 export const BASE_POSE: Pose = {
   x: 0, y: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 1, squash: 1, stretchX: 0,
   armL: -0.38, armR: 0.38, lid: 0, happy: 0, wide: 0, lookX: 0, lookY: 0,
-  mouth: 'smile', mouthOpen: 1, ringX: 0, ringY: 0, ringSpin: 0, ringScale: 1, ringGlow: 1, core: 1, blush: 1,
+  mouth: 'smile', mouthOpen: 1, mouthW: 1, brow: 0, browTilt: 0, browY: 0, shine: 1, ringX: 0, ringY: 0, ringSpin: 0, ringScale: 1, ringGlow: 1, core: 1, blush: 1,
 }
 
 const canvasOk = () => typeof document !== 'undefined'
@@ -189,6 +197,24 @@ export function buildSpriteRig(p: Palette, opts: { forExport?: boolean } = {}): 
     g.add(closed)
     eyes.push({ group: g, scale: sc, lid: lidPivot, shine, happy, closed })
   }
+  // 眉毛（影片的表情用；預設不顯示）
+  const browMat = new THREE.MeshStandardMaterial({ color: '#3B2034', roughness: 0.5 })
+  const brows: { g: THREE.Group; inner: THREE.Group; side: number }[] = []
+  for (const sx of [-1, 1]) {
+    const pos = onSurface(sx * 0.33, 0.37, 1.0)
+    const g = new THREE.Group()
+    g.position.copy(pos)
+    g.lookAt(pos.clone().multiplyScalar(3))
+    const inner = new THREE.Group()
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.17, 6, 12), browMat)
+    m.rotation.z = Math.PI / 2
+    m.position.z = 0.02
+    inner.add(m)
+    g.add(inner)
+    g.visible = false
+    face.add(g)
+    brows.push({ g, inner, side: sx })
+  }
   // 腮紅
   const blushTex = radialTexture([[0, rgba('#FF7E5F', 0.7)], [0.55, rgba('#FF8A65', 0.3)], [1, rgba('#FF8A65', 0)]], 128)
   const blushMat = new THREE.MeshBasicMaterial({ map: blushTex, color: blushTex ? '#FFFFFF' : '#FF8A65', transparent: true, opacity: blushTex ? 1 : 0.45, depthWrite: false, toneMapped: false })
@@ -238,7 +264,9 @@ export function buildSpriteRig(p: Palette, opts: { forExport?: boolean } = {}): 
   grinT.scale.set(1.3, 0.55, 1)
   grinT.position.set(0, -0.095, 0.018)
   grin.add(grinM, grinT)
-  const mouths: Record<Mouth, THREE.Object3D> = { smile, open, o: oMouth, grin }
+  const frown = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.024, 12, 32, Math.PI), mouthMat)
+  frown.position.set(0, -0.07, 0.012)
+  const mouths: Record<Mouth, THREE.Object3D> = { smile, open, o: oMouth, grin, frown }
   for (const m of Object.values(mouths)) mouthG.add(m)
 
   // 短短的手：膠囊，支點在肩膀
@@ -312,7 +340,7 @@ export function buildSpriteRig(p: Palette, opts: { forExport?: boolean } = {}): 
       e.shine.visible = !hap && pose.lid < 0.55
       e.happy.visible = hap
       e.scale.scale.set(eyeScale, 1.36 * eyeScale, 0.62)
-      e.shine.scale.setScalar(eyeScale)
+      e.shine.scale.setScalar(eyeScale * pose.shine)
       e.lid.rotation.x = -Math.PI / 2 + THREE.MathUtils.clamp(pose.lid, 0, 1) * Math.PI * 0.98
       e.closed.visible = !hap && pose.lid > 0.82
     }
@@ -320,6 +348,14 @@ export function buildSpriteRig(p: Palette, opts: { forExport?: boolean } = {}): 
     const mo = THREE.MathUtils.clamp(pose.mouthOpen, 0.2, 1.6)
     open.scale.set(1, mo, 1)
     grin.scale.set(1, mo, 1)
+    const mo2 = THREE.MathUtils.clamp(pose.mouthOpen, 0.3, 1.8)
+    oMouth.scale.set(0.85 * mo2, 1.1 * mo2, 1)
+    mouthG.scale.set(Math.max(0.2, pose.mouthW), 1, 1)
+    for (const b of brows) {
+      b.g.visible = pose.brow > 0.01
+      b.inner.rotation.z = -b.side * pose.browTilt
+      b.inner.position.set(-b.side * 0.02 * pose.browTilt, 0.11 * pose.browY, 0)
+    }
     blushMat.opacity = (blushTex ? 1 : 0.45) * THREE.MathUtils.clamp(pose.blush, 0, 1.2)
     ring.position.set(pose.ringX, 1.3 + pose.ringY, 0)
     ring.scale.setScalar(Math.max(0.0001, pose.ringScale))
