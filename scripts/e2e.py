@@ -1,4 +1,4 @@
-"""端對端測試：用 Playwright 開手機尺寸的 Chromium，跑過地圖、搭車點亮、小精靈、拍車辨識、AR、好友、營運、劇本、設定。
+"""端對端測試：用 Playwright 開手機尺寸的 Chromium，跑過任務輪播、搭車點亮、錯峰點燈（早上選晚點走、傍晚搭 19:00 卡換和泰 Points）、小精靈預報（現在走）、拍車辨識與拍車任務、AR、好友、營運、四個時段配色、設定。
 
 先建置並啟動預覽：
   npm run build && npm run preview -- --port 4173
@@ -10,6 +10,7 @@
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -43,26 +44,79 @@ def main():
         page = ctx.new_page()
         page.on('console', lambda m: logs.append(f'[{m.type}] {m.text}'[:300]))
         page.on('pageerror', lambda e: failures.append(f'pageerror: {e}'[:500]))
-        tab = lambda name: page.get_by_role('button', name=name, exact=True).click()
+        # 小精靈分頁有新預報時，名稱後面會多「（有新預報）」給讀屏軟體
+        tab = lambda name: page.get_by_role('button', name=re.compile('^' + re.escape(name) + r'\s*(（有新預報）)?$')).click()
+        phase = lambda: page.evaluate('document.documentElement.dataset.phase')
+
+        def script_step(i):
+            page.get_by_role('button', name='一天劇本').click()
+            page.wait_for_timeout(400)
+            page.get_by_role('menuitem').nth(i).click()
+            page.wait_for_timeout(1500)
 
         page.goto(a.url)
         page.wait_for_timeout(9000)
+        if page.locator('.tab-dot').count() == 0:
+            failures.append('小精靈分頁沒有亮出新預報的紅點')
+        script_step(0)  # 早上 08:30：早晨配色、淺色底圖
+        page.wait_for_timeout(3000)
+        if phase() != 'dawn':
+            failures.append(f'08:30 應該是早晨配色，實際是 {phase()}')
+        shot(page, 'p1_dawn')
+
+        # 錯峰點燈・早上決定：不搭車的時候先看預報，選「晚點走」
+        tab('小精靈')
+        page.wait_for_timeout(1200)
+        log = page.locator('.chat-log').inner_text()
+        if '叫車到上車' not in log:
+            failures.append('小精靈第一句沒有叫車預報：' + log.replace('\n', ' ')[:120])
+        if '八成' not in log or 'LightGBM' not in log:
+            failures.append('預報沒有顯示 LightGBM 的八成區間：' + log.replace('\n', ' ')[:160])
+        if '312' not in log and '128' not in log:
+            failures.append('預報旁沒有城市層級的錯峰人數：' + log.replace('\n', ' ')[:160])
+        shot(page, 'm1_forecast')
+        page.get_by_role('button', name='晚點走').click()
+        page.wait_for_timeout(1200)
+        log = page.locator('.chat-log').inner_text()
+        if '19:00' not in log:
+            failures.append('按「晚點走」後小精靈沒有回覆 19:00：' + log.replace('\n', ' ')[-120:])
+        shot(page, '03_chat')
+        later_card = '今日任務' in log  # 週末的預報是下一個平日，不會多一張今天的卡
+        if later_card:
+            page.get_by_role('button', name='到地圖看這張卡').click()
+            page.wait_for_timeout(2500)  # 等輪播滑到那張卡
+            shot(page, '03b_later_card')
+            if page.get_by_text('19:00 從市府回家').count() == 0:
+                failures.append('按「晚點走」後任務輪播沒有多一張 19:00 的卡')
+
+        script_step(1)  # 午休 12:30：步行、拍車、搭車各一張卡，加上早上排好的 19:00 卡
+        if phase() != 'day':
+            failures.append(f'12:30 應該是白天配色，實際是 {phase()}')
+        if later_card and page.get_by_text('19:00 從市府回家').count() == 0:
+            failures.append('換到午休時段後，早上排好的 19:00 卡不見了')
         shot(page, '01_map')
         start = page.locator('.chip-lamp').first.inner_text()
 
-        page.get_by_role('button', name='預約 yoxi').first.click()
+        page.get_by_role('button', name='我到了').first.click()
+        page.wait_for_timeout(600)
+        if page.locator('.task.done').count() < 1:
+            failures.append('按「我到了」之後卡片沒有蓋上已完成')
+        page.wait_for_timeout(1200)
+        shot(page, '01b_walk_done')
+
+        page.get_by_role('button', name='預約 yoxi').first.click()  # 松菸：任務卡是預約，算錯峰
         page.wait_for_timeout(11000)
         shot(page, '02_ride')
         after = page.locator('.chip-lamp').first.inner_text()
         if start == after:
             failures.append(f'搭車後點亮比例沒有增加（{start} → {after}）')
 
-        tab('小精靈')
-        page.get_by_role('button', name='今晚會下雨嗎？').click()
-        page.wait_for_timeout(3500)
-        shot(page, '03_chat')
-
-        tab('拍車')
+        tab('城市')
+        page.wait_for_timeout(600)
+        if page.locator('.sheet-summary').count():  # 搭完車抽屜會收起來
+            page.locator('.sheet-summary').click()
+            page.wait_for_timeout(600)
+        page.get_by_role('button', name='去拍車').first.click()
         page.wait_for_timeout(3000)
         if has_cam:
             for _ in range(60):
@@ -79,6 +133,9 @@ def main():
             panel = page.locator('.scan-panel').inner_text()
             if 'TDX-39' not in panel:
                 failures.append('拍車沒有辨識出 TDX-3963：' + panel.replace('\n', ' ')[:200])
+            scan_card = page.locator('.task', has_text='找到一台 yoxi 車')
+            if scan_card.count() and 'done' not in (scan_card.first.get_attribute('class') or ''):
+                failures.append('拍到 yoxi 車後，拍車任務卡沒有自動完成')
             ar = page.get_by_role('button', name='AR 召喚')
             if ar.count():
                 ar.click()
@@ -89,18 +146,125 @@ def main():
         tab('好友')
         page.wait_for_timeout(2500)
         shot(page, '06_friends')
+        if '揪團' in page.locator('.friends-view').inner_text():
+            failures.append('好友頁還有揪團卡')
 
-        tab('營運')
+        # 小精靈會用工具：沒有 Gemini 時用關鍵字判斷，照樣呼叫查預報、排錯峰（排錯峰要按確認）
+        tab('小精靈')
+        page.wait_for_timeout(1200)
+        page.locator('#chat-input').fill('明天 8 點從公司叫車好叫嗎？')
+        page.locator('#chat-input').press('Enter')
+        page.wait_for_timeout(1500)
+        log = page.locator('.chat-log').inner_text()
+        if '八成在' not in log or '查預報' not in log:
+            failures.append('小精靈沒有用「查預報」工具回答：' + log.replace('\n', ' ')[-160:])
+        page.get_by_role('button', name='幫我避開尖峰').click()
+        page.wait_for_timeout(1500)
+        if page.locator('.proposal').count() == 0:
+            failures.append('「幫我避開尖峰」沒有出現錯峰提案的確認卡')
+        else:
+            shot(page, 'c4_tools')
+            page.get_by_role('button', name='確認排進任務').click()
+            page.wait_for_timeout(800)
+            if '已排進' not in page.locator('.chat-log').inner_text():
+                failures.append('按確認後小精靈沒有說已排進任務')
+
+        page.get_by_role('button', name='營運', exact=True).click()
         page.wait_for_timeout(9000)
+        card = page.locator('.offpeak-card')
+        if card.count() == 0 or '和泰' not in card.inner_text():
+            failures.append('營運頁沒有「錯峰點燈」卡')
+        else:
+            card.scroll_into_view_if_needed()
+            page.wait_for_timeout(500)
+            shot(page, '07b_ops_offpeak')
+        mc = page.locator('.model-card')
+        if mc.count() == 0 or '回測' not in mc.inner_text():
+            failures.append('營運頁沒有「模型與系統」卡')
+        else:
+            mc.scroll_into_view_if_needed()
+            page.wait_for_timeout(500)
+            shot(page, '07c_model')
         page.get_by_role('button', name='設計空車時段任務').click()
         page.wait_for_timeout(3000)
         shot(page, '07_ops')
+        page.get_by_role('button', name='← 回乘客畫面').click()
+        page.wait_for_timeout(500)
 
-        page.get_by_role('button', name='一天劇本').click()
-        page.wait_for_timeout(400)
-        page.get_by_role('menuitem').nth(3).click()
-        page.wait_for_timeout(1500)
+        script_step(2)  # 路上 15:00：黃昏配色
+        tab('城市')
+        page.wait_for_timeout(3000)
+        if phase() != 'dusk':
+            failures.append(f'15:00 應該是黃昏配色，實際是 {phase()}')
+        shot(page, 'p3_dusk')
+
+        script_step(3)  # 傍晚 18:05：按早上排好的 19:00 卡出發，錯峰點燈換 Points
+        if phase() != 'night':
+            failures.append(f'18:05 應該是夜晚配色，實際是 {phase()}')
+        if later_card:
+            page.wait_for_timeout(1500)
+            if page.locator('.sheet-summary').count():
+                page.locator('.sheet-summary').click()
+                page.wait_for_timeout(600)
+            later = page.locator('.task', has_text='19:00 從市府回家')
+            if later.count() == 0:
+                failures.append('傍晚找不到早上排好的 19:00 卡')
+            else:
+                later.first.get_by_role('button', name='預約 yoxi').click()
+                got = False
+                for _ in range(44):
+                    page.wait_for_timeout(500)
+                    pop = page.locator('.sprite-pop')
+                    if pop.count() and '和泰 Points' in pop.first.inner_text():
+                        got = True
+                        break
+                if got:
+                    page.wait_for_timeout(2500)  # 讓地圖把整條軌跡畫完
+                    shot(page, 'e1_points')
+                else:
+                    failures.append('錯峰搭車後沒有跳出換到和泰 Points')
+                page.wait_for_timeout(3000)
+
+        tab('小精靈')
+        page.wait_for_timeout(1200)
         shot(page, '08_evening')
+        page.get_by_role('button', name='現在走').click()
+        # 軟體繪圖下計時器會延遲，固定等幾秒可能剛好錯過等車畫面，改成輪詢
+        waited = False
+        for _ in range(30):
+            page.wait_for_timeout(300)
+            if '等車中' in page.locator('.map-view').inner_text():
+                waited = True
+                break
+        page.wait_for_timeout(400)
+        shot(page, '10_wait')
+        if not waited:
+            failures.append('按「現在走」後沒有出現等車畫面')
+        page.wait_for_timeout(13000)
+        shot(page, '11_home')
+
+        # 三位示範人物：切到阿哲，地圖換成他的足跡、有「19:00 從市府回板橋」的卡；切回小涵，點亮比例還在
+        tab('城市')
+        page.wait_for_timeout(600)
+        han_lit = page.locator('.chip-lamp').first.inner_text()
+        page.locator('.persona-chip').click()
+        page.wait_for_timeout(400)
+        page.get_by_role('menuitemradio', name='阿哲').click()
+        page.wait_for_timeout(3500)
+        if page.locator('.sheet-summary').count():
+            page.locator('.sheet-summary').click()
+            page.wait_for_timeout(600)
+        shot(page, '12_persona_azhe')
+        if page.locator('.task', has_text='19:00 從市府回板橋').count() == 0:
+            failures.append('切到阿哲後沒有「19:00 從市府回板橋」的卡')
+        if '阿哲' not in page.locator('.persona-chip').inner_text():
+            failures.append('切到阿哲後頂欄的名字沒有換')
+        page.locator('.persona-chip').click()
+        page.wait_for_timeout(400)
+        page.get_by_role('menuitemradio', name='小涵').click()
+        page.wait_for_timeout(2500)
+        if page.locator('.chip-lamp').first.inner_text() != han_lit:
+            failures.append(f'切回小涵後點亮比例變了（{han_lit} → {page.locator(".chip-lamp").first.inner_text()}）')
 
         page.get_by_role('button', name='設定').click()
         page.wait_for_timeout(500)

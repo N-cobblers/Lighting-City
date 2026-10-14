@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../lib/store'
+import { cellAt, poiById } from '../lib/geo'
 import { cropForOcr, loadOcr, recognize } from '../lib/ocr'
 import { DEMO_FLEET_HASHES, SPRITE_PALETTES, extractPlate, maskPlate, paletteFor, plateDigitSum, plateHash } from '../lib/lucky'
 import { mountSpriteStage, type SpriteStage, exportSpriteGlb } from '../lib/sprite3d'
@@ -138,6 +139,13 @@ export function ScanView() {
     setFound((f) => (f ? { ...f, title: l.title, line: l.line, source: l.source } : f))
     s.addCollected({ plateMasked: maskPlate(plate), sum, palette: palette.name, at: Date.now(), line: l.line, title: l.title })
     ensureSubmit(s.settings, { name: s.settings.nickname || '我', sum, diff, plateMasked: maskPlate(plate), palette: palette.name })
+    const task = s.tasks.find((t) => t.kind === 'scan' && !t.done)
+    if (task) {
+      const p = poiById(task.poiId)
+      if (p) s.lightCells([cellAt(p.lng, p.lat)], 2)
+      s.completeTask(task.id)
+      s.toast(`完成任務「${task.title}」，點亮 1 格！`, 'lamp')
+    }
   }
 
   const capture = async () => {

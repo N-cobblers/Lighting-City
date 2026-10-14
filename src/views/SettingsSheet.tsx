@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../lib/store'
 import { DEFAULT_MODEL, type Settings } from '../lib/settings'
-import { DEMO_PERSONAS } from '../data/demo'
+import { DEMO_PERSONAS, getDemoPersona } from '../data/demo'
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const s = useStore()
@@ -57,7 +57,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <input id="room" className="input" value={d.room} onChange={(e) => set({ room: e.target.value })} />
         </label>
         <label className="field" htmlFor="demo-persona">
-          <span>Demo 玩家（不同人會看到不同路網與任務偏好）</span>
+          <span>示範人物（虛構；每個人的足跡、任務、錯峰點燈分開存，頂欄點名字也能切換）</span>
           <select id="demo-persona" className="input" value={d.demoPersonaId} onChange={(e) => set({ demoPersonaId: e.target.value })}>
             {DEMO_PERSONAS.map((p) => (
               <option key={p.id} value={p.id}>
@@ -72,6 +72,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <span>天氣來源</span>
           <select id="wm" className="input" value={d.weatherMode} onChange={(e) => set({ weatherMode: e.target.value as Settings['weatherMode'] })}>
             <option value="rain">示範情境：傍晚下雨</option>
+            <option value="clear">示範情境：晴天</option>
             <option value="live">氣象署即時資料</option>
           </select>
         </label>
@@ -100,10 +101,10 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             className="btn-ghost"
             onClick={() => {
               s.resetLit()
-              s.toast('點燈進度已重設')
+              s.toast(`${getDemoPersona(s.settings.demoPersonaId).name}的點燈進度已重設`)
             }}
           >
-            重設點燈進度與圖鑑
+            重設目前人物的點燈進度與圖鑑
           </button>
         </div>
         <div className="row end">

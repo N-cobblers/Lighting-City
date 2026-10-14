@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import { BOTS, joinRoom, type RoomHandle } from '../lib/social'
+import { getDemoPersona } from '../data/demo'
 import type { Settings } from '../lib/settings'
 import { readJSON, writeJSON } from '../lib/settings'
 import type { Player } from '../lib/types'
@@ -55,7 +56,7 @@ export function FriendsView() {
     const myUid = handle?.uid
     const rows: (Player & { me?: boolean })[] = players.map((p) => ({ ...p, me: p.uid === myUid, diff: p.sum === null ? null : Math.abs(p.sum - s.lucky) }))
     if (!rows.some((r) => r.me) && mine) rows.push({ uid: 'me', name: s.settings.nickname || '我', sum: mine.sum, diff: Math.abs(mine.sum - s.lucky), plateMasked: mine.plateMasked, palette: mine.palette, updatedAt: Date.now(), me: true })
-    if (rows.filter((r) => !r.me).length < 3) rows.push(...BOTS(s.lucky).slice(0, 3 - rows.filter((r) => !r.me).length))
+    if (rows.filter((r) => !r.me).length < 3) rows.push(...BOTS(s.lucky, getDemoPersona(s.settings.demoPersonaId).name).slice(0, 3 - rows.filter((r) => !r.me).length))
     return rows.sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99) || a.updatedAt - b.updatedAt)
   }, [players, mine, s.lucky, s.settings.nickname])
 
@@ -91,26 +92,6 @@ export function FriendsView() {
           ))}
         </ol>
         {!mine && <p className="muted small">你今天還沒遇到 yoxi 車，去「拍車」頁試試看。</p>}
-      </section>
-
-      <section className="card group">
-        <strong>揪團散場任務</strong>
-        <p className="muted small">今晚大巨蛋散場時，和朋友一起完成任務、一起叫車回家，好友地圖一起點亮。</p>
-        <button
-          className="btn-lamp"
-          onClick={async () => {
-            const text = `今晚大巨蛋散場一起搭 yoxi？房間代碼 ${s.settings.room}`
-            try {
-              if (navigator.share) await navigator.share({ title: 'yoxi 點燈城', text })
-              else await navigator.clipboard.writeText(text)
-              s.toast('邀請已送出')
-            } catch {
-              s.toast('邀請已準備好')
-            }
-          }}
-        >
-          揪朋友
-        </button>
       </section>
 
       <section className="card">

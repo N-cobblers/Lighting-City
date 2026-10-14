@@ -1,5 +1,5 @@
 export type AppCheckMode = 'none' | 'debug' | 'recaptcha'
-export type WeatherMode = 'live' | 'rain'
+export type WeatherMode = 'live' | 'rain' | 'clear'
 
 export type Settings = {
   firebaseConfig: string

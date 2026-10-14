@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl'
 import { useStore, LOW_WINDOWS } from '../lib/store'
-import { opsPlan, type OpsPlan } from '../lib/ai'
+import { aiStats, opsPlan, type OpsPlan } from '../lib/ai'
 import { CENTER, cellCenter, cellsFeatureCollection } from '../lib/geo'
 import demand from '../data/demand.json'
+import modelCard from '../data/wait_model_card.json'
 import districts from '../data/districts.json'
 
 const D = demand as any
@@ -127,7 +128,7 @@ export function OpsView() {
 
   const push = () => {
     if (!plan) return
-    const task = { id: `ops-${Date.now()}`, title: plan.title.slice(0, 18), detail: plan.detail.slice(0, 50), kind: 'ride' as const, poiId: 'spot-songyan', window: `${hour}:00–${hour + 2}:00`, rewardCells: 6, rewardCredit: 30, reason: plan.reason }
+    const task = { id: `ops-${Date.now()}`, title: plan.title.slice(0, 18), detail: plan.detail.slice(0, 50), kind: 'ride' as const, poiId: 'spot-songyan', window: `${hour}:00–${hour + 2}:00`, rewardCells: 6, rewardCredit: 0, reason: plan.reason }
     s.setTasks([task, ...s.tasks.filter((t) => !t.id.startsWith('ops-'))].slice(0, 4), s.greeting, s.tasksSource || 'demo')
     s.toast('任務已推播給附近玩家', 'lamp')
   }
@@ -142,7 +143,7 @@ export function OpsView() {
   return (
     <div className="ops-view scroll">
       <header className="ops-head">
-        <strong>營運視角：需求預測導流</strong>
+        <strong>需求預測導流</strong>
         <span className="muted small">資料：yoxi 競賽資料 2026/2–4 彙總指數（不含個別行程）</span>
       </header>
       <div className="seg">
@@ -171,6 +172,41 @@ export function OpsView() {
           ))}
         </div>
       </label>
+
+      <section className="card offpeak-card" aria-label="錯峰點燈">
+        <div className="card-head">
+          <strong>錯峰點燈</strong>
+          <span className="demo-tag">示範＋試算</span>
+        </div>
+        <p className="small offpeak-line">不發優惠券，用光讓人錯峰。</p>
+        <div className="kpis kpis-2">
+          <div>
+            <b>312 人</b>
+            <span className="tiny muted">今天錯峰（示範）</span>
+          </div>
+          <div>
+            <b>-6%</b>
+            <span className="tiny muted">18 點叫車（示範）</span>
+          </div>
+          <div>
+            <b>NT$0.6</b>
+            <span className="tiny muted">每趟 Points 成本（試算）</span>
+          </div>
+          <div>
+            <b>NT$26.6</b>
+            <span className="tiny muted">每趟派遣費（試算）</span>
+          </div>
+        </div>
+        <p className="reason small">信義區平日等超過 10 分鐘：18 點 25%、19 點 11%（2026/2–4 競賽資料彙總）。避開尖峰一小時，等車就少很多。</p>
+        <ul className="offpeak-rules small">
+          <li>獎勵：錯峰的路線亮兩階；每 20 格錯峰之光換 1 點和泰 Points，每趟最多 2 點、每人每月上限 20 點，由和泰集團 Points 行銷預算支應</li>
+          <li>防洗：只算完成的行程，同一格一天只算一次</li>
+          <li>驗證：三組對照（只有光／光＋Points／都沒有）</li>
+        </ul>
+        <p className="muted tiny">試算：一趟錯峰約 12 格 ÷ 20 格／點 × NT$1 ≈ NT$0.6，長途每趟最多 2 點（NT$2）；派遣費 NT$266 × 10% ≈ NT$26.6。正式版用 yoxi 自己的行程紀錄判斷是否錯峰，點燈足跡仍只存在手機；原型用模擬行程。</p>
+      </section>
+
+      <ModelCard />
 
       <section className="card">
         <div className="card-head">
@@ -228,5 +264,63 @@ export function OpsView() {
         <p className="muted tiny">預估值為試算：附近玩家 520 人 × 8% 參與；司機端以 12 位自願加入的司機平均分配。</p>
       </section>
     </div>
+  )
+}
+
+/** 模型與系統：等車預測的回測結果、特徵重要性、Gemini 回應時間與成本控制、後端與測試。 */
+function ModelCard() {
+  const c = modelCard as any
+  const sm = c.backtest.summary
+  const ai = aiStats()
+  const row = (label: string, model: number, base: number, pct: number) => (
+    <tr>
+      <th scope="row">{label}</th>
+      <td>{model.toFixed(2)} 分</td>
+      <td>{base.toFixed(2)} 分</td>
+      <td className="better">{pct}%</td>
+    </tr>
+  )
+  return (
+    <section className="card model-card" aria-label="模型與系統">
+      <div className="card-head">
+        <strong>模型與系統</strong>
+        <span className="live-tag">實算＋試算</span>
+      </div>
+      <p className="small model-line">等車預測：LightGBM 分位數迴歸（中位數、八成區間）＋等超過 10 分鐘的機率，4 個行政區＋6 個熱門上車格。</p>
+      <table className="bt">
+        <caption className="tiny muted">4 週滾動回測（4/3–4/30，每週只用之前的資料）：逐時等車中位數的平均誤差</caption>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">新模型</th>
+            <th scope="col">現行作法</th>
+            <th scope="col">誤差減少</th>
+          </tr>
+        </thead>
+        <tbody>
+          {row('行政區', sm.district_mae_model, sm.district_mae_base, sm.district_improve_pct)}
+          {row('平日尖峰 17–19 點', sm.peak_mae_model, sm.peak_mae_base, sm.peak_improve_pct)}
+          {row('熱門上車格', sm.cell_mae_model, sm.cell_mae_base, sm.cell_improve_pct)}
+        </tbody>
+      </table>
+      <p className="tiny muted">八成區間實際涵蓋 {Math.round(sm.coverage_80 * 100)}% 的行程；現行作法＝近 4 週同星期同時段的中位數。</p>
+      <p className="small">
+        影響最大的特徵：
+        {c.importance.slice(0, 3).map((x: any, i: number) => (
+          <span key={x.feature} className="imp">
+            {i ? '、' : ''}
+            {x.feature} {x.pct}%
+          </span>
+        ))}
+      </p>
+      <ul className="offpeak-rules small">
+        <li>小精靈會用工具（Gemini function calling）：查預報、查進度、排錯峰；排錯峰只提案，按確認才加任務。沒網路時用關鍵字判斷，照樣用同一組工具。</li>
+        <li>
+          Gemini：{ai.avgMs == null ? '目前用示範資料（未連線）' : `最近 ${ai.calls} 次平均 ${(ai.avgMs / 1000).toFixed(1)} 秒`}；任務快取命中 {ai.cacheHits} 次，同一時段同樣天氣只生成一次；每位月活每月雲端約 NT$0.71（試算）。
+        </li>
+        <li>錯峰點燈後端：Cloud Functions＋Firestore 規則，Points 帳本用行程編號防重複；城市數字每區每小時至少 20 人才顯示、取整到 10。</li>
+        <li>測試：單元測試、Firebase 模擬器測試、e2e，GitHub Actions 每個 PR 自動跑。</li>
+      </ul>
+    </section>
   )
 }

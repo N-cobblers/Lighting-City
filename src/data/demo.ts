@@ -1,4 +1,7 @@
 import type { Task } from '../lib/types'
+import { laterHomeTask, type Home } from '../lib/homeTask'
+
+type Box = { south: number; north: number; west: number; east: number }
 
 export type DemoPersona = {
   id: string
@@ -7,12 +10,26 @@ export type DemoPersona = {
   role: string
   home: { poiId: string; label: string }
   work: { poiId: string; label: string }
+  /** 回家卡上的「回 X」與從市府回家的路線 */
+  homeCard: Home
+  /** 小精靈示範對話裡說的家的地名 */
+  homePlace: string
+  /** 從家去上班的路線（任務要去公司時用） */
+  workRoute: string
+  /** 這個人去某些地點時走的路線（例如從家出發的週末行程）；沒列的地點從市府出發 */
+  routes: Record<string, string>
+  /** 「點亮 X%」的分母：這個人的生活圈 */
+  region: Box
   habits: string[]
   history30d: { day: number; route: string }[]
   walkedPois: string[]
 }
 
-/** 示範玩家（虛構人物）。每個角色都代表一種不同的路網與生活型態，方便 demo 時直接看出雙北場景的差異。 */
+/**
+ * 示範玩家（虛構人物）。小涵是影片與 demo 的主角，行為型態參考 yoxi 資料中常客的共同特徵：
+ * 上下車集中在 2 個地點、行程集中在同一個 3 小時區段。阿哲、小雅是虛構的對照，用來說明每個人亮起來的地方不一樣；
+ * 不是從競賽資料挑出的真實乘客。三人都在市府附近上班。
+ */
 export const DEMO_PERSONAS: DemoPersona[] = [
   {
     id: 'xiao-han',
@@ -21,6 +38,11 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     role: '信義區上班族',
     home: { poiId: 'home-xiao-han', label: '家（松山區民生社區）' },
     work: { poiId: 'work', label: '公司（信義區市府附近）' },
+    homeCard: { word: '家', route: 'evening-home' },
+    homePlace: '民生社區',
+    workRoute: 'morning-work',
+    routes: {},
+    region: { south: 25.024, north: 25.066, west: 121.543, east: 121.588 },
     habits: [
       '平日 18:00–20:00 下班常叫 yoxi 回家（近 30 天 9 次，平常走敦化北路）',
       '下雨的早上會叫車上班（近 30 天 4 次）',
@@ -56,26 +78,35 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     role: '板橋通勤族',
     home: { poiId: 'home-a-zhe', label: '家（板橋新埔）' },
     work: { poiId: 'work', label: '公司（信義區市府附近）' },
+    homeCard: { word: '板橋', route: 'banciao-home' },
+    homePlace: '板橋新埔',
+    workRoute: 'banciao-commute',
+    routes: { 'spot-banciao': 'banciao-weekend' },
+    region: { south: 25.003, north: 25.052, west: 121.448, east: 121.575 },
     habits: [
-      '週一到週五早晚通勤都走板橋到信義的主要幹線，低谷時段更容易回頭叫車',
-      '傍晚常在板橋轉乘，回程的空車指數習慣在 17:30–19:00 上升',
-      '週末會在淡水河岸走路，常用點亮街區補足非通勤日的活動紀錄',
-      '愛在大眾運輸與路邊上車點切換，對低谷景點任務比較有反應',
+      '平日早上從板橋新埔搭 yoxi 到市府上班（近 30 天 10 次）',
+      '下班常在 18 點尖峰叫車回板橋，等得比較久（近 30 天 6 次）',
+      '週末在板橋府中一帶活動',
+      '午休會在公司附近走走',
     ],
     history30d: [
       { day: 1, route: 'banciao-commute' },
       { day: 2, route: 'banciao-commute' },
-      { day: 4, route: 'banciao-commute' },
-      { day: 7, route: 'banciao-commute' },
+      { day: 2, route: 'banciao-home' },
+      { day: 6, route: 'banciao-weekend' },
+      { day: 8, route: 'banciao-commute' },
       { day: 9, route: 'banciao-commute' },
-      { day: 12, route: 'banciao-commute' },
-      { day: 14, route: 'banciao-commute' },
-      { day: 17, route: 'banciao-commute' },
-      { day: 18, route: 'weekend-xiangshan' },
-      { day: 21, route: 'banciao-commute' },
-      { day: 24, route: 'banciao-commute' },
+      { day: 9, route: 'banciao-home' },
+      { day: 15, route: 'banciao-commute' },
+      { day: 16, route: 'banciao-home' },
+      { day: 20, route: 'banciao-weekend' },
+      { day: 22, route: 'banciao-commute' },
+      { day: 23, route: 'banciao-commute' },
+      { day: 23, route: 'banciao-home' },
       { day: 27, route: 'banciao-commute' },
-      { day: 28, route: 'weekend-raohe' },
+      { day: 28, route: 'banciao-home' },
+      { day: 29, route: 'banciao-commute' },
+      { day: 30, route: 'banciao-home' },
     ],
     walkedPois: ['banciao', 'sunyatsen'],
   },
@@ -86,25 +117,31 @@ export const DEMO_PERSONAS: DemoPersona[] = [
     role: '淡水週末旅遊者',
     home: { poiId: 'home-xiao-ya', label: '家（淡水老街）' },
     work: { poiId: 'spot-cityhall', label: '工作（市府附近）' },
+    homeCard: { word: '淡水', route: 'tamsui-home' },
+    homePlace: '淡水',
+    workRoute: 'tamsui-commute',
+    routes: { 'spot-tamsui': 'tamsui-weekend' },
+    region: { south: 25.03, north: 25.19, west: 121.41, east: 121.575 },
     habits: [
-      '工作日傍晚常從淡水出發到台北市區，會順路逛河岸步道與文創空間',
-      '週末單日多路線切換，休閒目的地比通勤路線更分散',
-      '吃飯和散步任務最容易激發她打開 App，點亮河岸街區很有動力',
-      '喜歡用搭車和步行組合，不依賴固定兩點路線',
+      '平日從淡水通勤到市府附近上班，下雨天會搭 yoxi（近 30 天 5 次）',
+      '下班常搭 yoxi 回淡水，路程長，最怕尖峰叫不到車',
+      '週末喜歡沿河岸去漁人碼頭看夕陽',
+      '午休喜歡走去松菸看展',
     ],
     history30d: [
-      { day: 3, route: 'tamsui-evening' },
-      { day: 6, route: 'weekend-raohe' },
-      { day: 8, route: 'tamsui-evening' },
-      { day: 10, route: 'weekend-xiangshan' },
-      { day: 12, route: 'tamsui-evening' },
+      { day: 3, route: 'tamsui-commute' },
+      { day: 4, route: 'tamsui-weekend' },
+      { day: 8, route: 'tamsui-home' },
+      { day: 11, route: 'tamsui-weekend' },
       { day: 15, route: 'afternoon-songyan' },
-      { day: 20, route: 'weekend-raohe' },
-      { day: 23, route: 'tamsui-evening' },
-      { day: 25, route: 'weekend-xiangshan' },
-      { day: 29, route: 'tamsui-evening' },
+      { day: 17, route: 'tamsui-commute' },
+      { day: 17, route: 'tamsui-home' },
+      { day: 18, route: 'tamsui-weekend' },
+      { day: 22, route: 'tamsui-home' },
+      { day: 25, route: 'tamsui-weekend' },
+      { day: 29, route: 'tamsui-commute' },
     ],
-    walkedPois: ['tamsui', 'raohe', 'songyan'],
+    walkedPois: ['tamsui', 'songyan'],
   },
 ]
 
@@ -126,100 +163,105 @@ export function slotOf(d: Date): Slot {
   return 'evening'
 }
 
-/** Gemini 無法連線時使用的示範任務（畫面會標「示範資料」）。 */
-export const FALLBACK_TASKS: Record<Slot, { greeting: string; tasks: Task[] }> = {
+type SlotTasks = Record<Slot, { greeting: string; tasks: Task[] }>
+
+/** Gemini 無法連線時使用的示範任務（畫面會標「示範資料」）。不發乘車金，rewardCredit 一律 0；poiId 'home' 是目前玩家的家。 */
+export const FALLBACK_TASKS: SlotTasks = {
   morning: {
     greeting: '早安小涵！今天傍晚會下雨，我先幫你排好三個任務。',
     tasks: [
-      { id: 'f-m1', title: '午休走去國父紀念館', detail: '走到國父紀念館打卡，點亮一格新的街區。', kind: 'walk', poiId: 'sunyatsen', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '常客午休多在公司附近活動，步行任務不需搭車也能打開 App。' },
-      { id: 'f-m2', title: '下午搭 yoxi 去松菸', detail: '14–16 點搭 yoxi 去松菸，沿途點亮街區，乘車金折 30 元。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點是需求低谷，等車時間短，空車相對多。' },
-      { id: 'f-m3', title: '下雨前預約回家', detail: '18 點前預約 yoxi 回民生社區，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚降雨機率高，平日 18 點是叫車尖峰，提早預約避開等不到車。' },
+      { id: 'f-m1', title: '午休走去國父紀念館', detail: '走到國父紀念館打卡，點亮一格新的街區。', kind: 'walk', poiId: 'sunyatsen', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '從公司走過去約 10 分鐘，午休剛好' },
+      { id: 'f-m2', title: '下午搭 yoxi 去松菸', detail: '14–16 點預約 yoxi 去松菸，沿途點亮街區。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 0, reason: '信義區平日 14–15 點空車多，好叫車' },
+      { id: 'f-m3', title: '下雨前預約回家', detail: '18 點前預約 yoxi 回民生社區，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚可能下雨，18 點又是下班尖峰' },
     ],
   },
   lunch: {
     greeting: '午休時間！走一小段路就能點亮新的一格。',
     tasks: [
-      { id: 'f-l1', title: '散步到四四南村', detail: '午休走到四四南村，點亮 101 旁的老眷村。', kind: 'walk', poiId: 'sisinan', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '步行任務讓不搭車的日子也有打開的理由。' },
-      { id: 'f-l2', title: '下午搭 yoxi 去松菸', detail: '14–16 點搭 yoxi 去松菸，乘車金折 30 元。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點需求低、等車短，導流到空車時段。' },
-      { id: 'f-l3', title: '找到一台 yoxi 車', detail: '在人行道上遇見停妥的 yoxi 車，拍一下收集小精靈。', kind: 'walk', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區最熱門的 yoxi 上車點之一。' },
+      { id: 'f-l1', title: '散步到四四南村', detail: '午休走到四四南村，點亮 101 旁的老眷村。', kind: 'walk', poiId: 'sisinan', window: '12:00–13:30', rewardCells: 1, rewardCredit: 0, reason: '從公司走過去約 15 分鐘，午休剛好' },
+      { id: 'f-l2', title: '下午搭 yoxi 去松菸', detail: '14–16 點預約 yoxi 去松菸，沿途點亮街區。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 0, reason: '信義區平日 14–15 點空車多，好叫車' },
+      { id: 'f-l3', title: '找到一台 yoxi 車', detail: '在人行道上遇見停妥的 yoxi 車，拍一下收集小精靈。', kind: 'scan', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區熱門的 yoxi 上車點' },
     ],
   },
   afternoon: {
     greeting: '下午好！現在附近空車多，是出門的好時機。',
     tasks: [
-      { id: 'f-a1', title: '現在搭 yoxi 去松菸', detail: '16 點前出發，乘車金折 30 元，沿途點亮 6 格。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 30, reason: '信義區平日 14–15 點是需求低谷，空車相對多。' },
-      { id: 'f-a2', title: '拍一台 yoxi 車', detail: '車牌加總最接近今日幸運數字的人獲勝。', kind: 'walk', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '遇見 yoxi 車是不用搭車也能玩的彩蛋。' },
-      { id: 'f-a3', title: '下雨前預約回家', detail: '18 點前預約 yoxi，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚降雨機率高，提早預約避開尖峰。' },
+      { id: 'f-a1', title: '現在搭 yoxi 去松菸', detail: '16 點前出發，沿途點亮 6 格。', kind: 'ride', poiId: 'spot-songyan', window: '14:00–16:00', rewardCells: 6, rewardCredit: 0, reason: '現在是信義區空車多的時段' },
+      { id: 'f-a2', title: '拍一台 yoxi 車', detail: '車牌加總最接近今日幸運數字的人獲勝。', kind: 'scan', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區熱門的 yoxi 上車點' },
+      { id: 'f-a3', title: '下雨前預約回家', detail: '18 點前預約 yoxi，一路點亮回家的路。', kind: 'ride', poiId: 'home', window: '17:30–18:30', rewardCells: 12, rewardCredit: 0, reason: '傍晚可能下雨，提早預約不用在路邊等' },
     ],
   },
   evening: {
     greeting: '六點開始下雨了，先幫你預約回家吧！',
     tasks: [
-      { id: 'f-e1', title: '預約 yoxi 回家', detail: '18:10 從市府路上車點出發，沿途點亮 12 格。', kind: 'ride', poiId: 'home', window: '18:00–18:30', rewardCells: 12, rewardCredit: 0, reason: '下雨加上下班尖峰，提早預約能縮短等車時間。' },
-      { id: 'f-e2', title: '揪同事一起回民生社區', detail: '同方向的同事一起搭，車資平分，好友地圖一起點亮。', kind: 'group', poiId: 'home', window: '18:00–19:00', rewardCells: 4, rewardCredit: 0, reason: '揪團把兩趟需求併成一趟，尖峰時段更有效率。' },
-      { id: 'f-e3', title: '週末去饒河街夜市', detail: '週六 20 點後搭 yoxi 去饒河街，點亮松山東側。', kind: 'ride', poiId: 'raohe', window: '週六 20:00–21:00', rewardCells: 8, rewardCredit: 20, reason: '松山區平日與週末 20 點需求回落，等車短。' },
+      { id: 'f-e2', title: '晚點走前先吃晚餐', detail: '到捷運市政府站一帶吃晚餐，順便點亮一格。', kind: 'walk', poiId: 'mrt-cityhall', window: '18:00–19:00', rewardCells: 1, rewardCredit: 0, reason: '18 點是尖峰，先吃飯再走剛好' },
+      { id: 'f-e1', title: '預約 yoxi 回家', detail: '18:10 從市府路上車點出發，沿途點亮 12 格。', kind: 'ride', poiId: 'home', window: '18:00–18:30', rewardCells: 12, rewardCredit: 0, reason: '下雨又遇上下班尖峰，預約比較穩' },
+      { id: 'f-e3', title: '週末去饒河街夜市', detail: '週六 20 點後搭 yoxi 去饒河街，點亮松山東側。', kind: 'ride', poiId: 'raohe', window: '週六 20:00–21:00', rewardCells: 8, rewardCredit: 0, reason: '松山區晚上 8 點後需求回落，等車短' },
     ],
   },
 }
 
-const PERSONA_TASKS: Record<string, { afternoonPoi: string; afternoonTitle: string; afternoonDetail: string; homeTitle: string; homeLabel: string }> = {
-  'xiao-han': {
-    afternoonPoi: 'spot-songyan',
-    afternoonTitle: '下午搭 yoxi 去松菸',
-    afternoonDetail: '14–16 點搭 yoxi 去松菸，沿途點亮街區，乘車金折 30 元。',
-    homeTitle: '預約 yoxi 回民生社區',
-    homeLabel: '民生社區',
-  },
+const walk = (id: string, title: string, detail: string, poiId: string, window: string, reason: string): Task => ({ id, title, detail, kind: 'walk', poiId, window, rewardCells: 1, rewardCredit: 0, reason })
+const scan = (id: string): Task => ({ id, title: '找到一台 yoxi 車', detail: '在市府路上車點附近，拍一台停妥的 yoxi 車。', kind: 'scan', poiId: 'spot-cityhall', window: '全天', rewardCells: 1, rewardCredit: 0, reason: '市府路上車點是信義區熱門的 yoxi 上車點' })
+const dinner = (id: string) => walk(id, '晚點走前先吃晚餐', '到捷運市政府站一帶吃晚餐，順便點亮一格。', 'mrt-cityhall', '18:00–19:00', '18 點是尖峰，先吃飯再走剛好')
+
+/** 小涵在傍晚不下雨的日子：開場白不提下雨，也不排 18 點前後的回家車（要不要晚點走，由小精靈的預報決定）。 */
+const HAN_CLEAR: Record<Slot, { greeting: string; drop: string[]; add: Task[] }> = {
+  morning: { greeting: '早安小涵！今晚 18 點市府比較難叫，我先幫你排好三個任務。', drop: ['f-m3'], add: [scan('f-m3c')] },
+  lunch: { greeting: '午休時間！走一小段路就能點亮新的一格。', drop: [], add: [] },
+  afternoon: { greeting: '下午好！現在附近空車多，是出門的好時機。', drop: ['f-a3'], add: [] },
+  evening: { greeting: '現在正是尖峰，先吃個飯，19:00 再走會快很多。', drop: ['f-e1'], add: [] },
+}
+
+/** 阿哲、小雅的示範任務：不搭車的排前面，最後一張是早上就排好的「晚點走」回家卡。 */
+const OTHER_TASKS: Record<string, SlotTasks> = {
   'a-zhe': {
-    afternoonPoi: 'spot-cityhall',
-    afternoonTitle: '下午搭 yoxi 去市府',
-    afternoonDetail: '14–16 點搭 yoxi 前往市府商圈，沿途點亮通勤路網，乘車金折 30 元。',
-    homeTitle: '預約 yoxi 回板橋',
-    homeLabel: '板橋新埔',
+    morning: { greeting: '早安阿哲！今晚市府 18 點難叫，回板橋的車我先排在 19:00。', tasks: [walk('z-m1', '午休走去國父紀念館', '從公司走到國父紀念館，點亮一格新的街區。', 'sunyatsen', '12:00–13:30', '從公司走過去約 10 分鐘，午休剛好'), scan('z-m2')] },
+    lunch: { greeting: '午休時間！走一小段路就能點亮新的一格。', tasks: [walk('z-l1', '散步到四四南村', '午休走到四四南村，點亮 101 旁的老眷村。', 'sisinan', '12:00–13:30', '從公司走過去約 15 分鐘，午休剛好'), scan('z-l2')] },
+    afternoon: {
+      greeting: '下午好！回板橋的車排在 19:00，避開尖峰。',
+      tasks: [scan('z-a1'), { id: 'z-a2', title: '週末去板橋府中逛逛', detail: '週六從家搭 yoxi 到府中，點亮板橋的街區。', kind: 'ride', poiId: 'spot-banciao', window: '週六 14:00–17:00', rewardCells: 6, rewardCredit: 0, reason: '週末下午板橋一帶不是尖峰，好叫車' }],
+    },
+    evening: { greeting: '現在正是尖峰，先吃個飯，19:00 再走會快很多。', tasks: [dinner('z-e1'), scan('z-e2')] },
   },
   'xiao-ya': {
-    afternoonPoi: 'spot-tamsui',
-    afternoonTitle: '下午搭 yoxi 去淡水河岸',
-    afternoonDetail: '14–16 點搭 yoxi 去淡水漁人碼頭，沿途點亮河岸街區，乘車金折 30 元。',
-    homeTitle: '預約 yoxi 回淡水',
-    homeLabel: '淡水老街',
+    morning: { greeting: '早安小雅！今晚市府 18 點難叫，回淡水的車我先排在 19:00。', tasks: [walk('y-m1', '午休走去松菸看展', '從公司走到松山文創園區，點亮一格新的街區。', 'songyan', '12:00–13:30', '從公司走過去約 12 分鐘，午休剛好'), scan('y-m2')] },
+    lunch: { greeting: '午休時間！走一小段路就能點亮新的一格。', tasks: [walk('y-l1', '散步到國父紀念館', '午休走到國父紀念館，點亮一格新的街區。', 'sunyatsen', '12:00–13:30', '從公司走過去約 10 分鐘，午休剛好'), scan('y-l2')] },
+    afternoon: {
+      greeting: '下午好！回淡水的車排在 19:00，避開尖峰。',
+      tasks: [scan('y-a1'), { id: 'y-a2', title: '週六沿河岸去漁人碼頭', detail: '週六傍晚從老街搭 yoxi 去漁人碼頭看夕陽，點亮河岸。', kind: 'ride', poiId: 'spot-tamsui', window: '週六 16:00–18:00', rewardCells: 8, rewardCredit: 0, reason: '週末傍晚淡水不是叫車尖峰' }],
+    },
+    evening: { greeting: '現在正是尖峰，先吃個飯，19:00 再回淡水會快很多。', tasks: [dinner('y-e1'), scan('y-e2')] },
   },
 }
 
-/** 依目前 demo 玩家調整目的地與回家任務，避免所有角色共用同一組示範路線。 */
-export function getFallbackTasks(slot: Slot, personaId?: string | null) {
+/** 依目前 demo 玩家給示範任務；阿哲、小雅另外帶一張「晚點走」回家卡（pinned），rain = 傍晚會下雨（等車預測用下雨情境）。 */
+export function getFallbackTasks(slot: Slot, personaId?: string | null, now = new Date(), rain = false) {
   const persona = getDemoPersona(personaId)
-  const config = PERSONA_TASKS[persona.id] || PERSONA_TASKS[PERSONA.id]
-  const fallback = FALLBACK_TASKS[slot]
-  const tasks = fallback.tasks.map((task) => {
-    if (task.id === 'f-m2' || task.id === 'f-l2' || task.id === 'f-a1') {
-      return { ...task, poiId: config.afternoonPoi, title: config.afternoonTitle, detail: config.afternoonDetail }
-    }
-    if (task.poiId === 'home') {
-      return {
-        ...task,
-        poiId: persona.home.poiId,
-        title: task.kind === 'group' ? `揪同事一起回${config.homeLabel}` : config.homeTitle,
-        detail: task.kind === 'group'
-          ? `同方向的同事一起搭，車資平分，一起點亮回${config.homeLabel}的路。`
-          : `18 點前預約 yoxi 回${config.homeLabel}，沿途點亮回家的路。`,
-      }
-    }
-    return { ...task }
-  })
-  return {
-    greeting: fallback.greeting.replace('小涵', persona.name),
-    tasks,
+  const other = OTHER_TASKS[persona.id]
+  if (!other) {
+    const f = FALLBACK_TASKS[slot]
+    if (rain) return { greeting: f.greeting, tasks: f.tasks.map((t) => ({ ...t })) }
+    const c = HAN_CLEAR[slot]
+    return { greeting: c.greeting, tasks: [...f.tasks.filter((t) => !c.drop.includes(t.id)), ...c.add].map((t) => ({ ...t })) }
   }
+  const f = other[slot]
+  return { greeting: f.greeting, tasks: [...f.tasks.map((t) => ({ ...t })), laterHomeTask(persona.homeCard, now, undefined, rain)] }
 }
 
 export const FALLBACK_CHAT: { match: RegExp; reply: string }[] = [
   { match: /雨|天氣|傘/, reply: '今晚 6 點降雨機率 80%！要我幫你在 18:10 預約 yoxi 嗎？沿途能點亮 12 格喔。' },
-  { match: /預約|叫車|回家/, reply: '好的，幫你預約 18:10 從市府路上車點出發回民生社區，司機到了我會提醒你！' },
+  { match: /預約|叫車|回家/, reply: '好的，幫你預約 18:10 從市府路上車點出發回{home}，司機到了我會提醒你！' },
   { match: /幸運|數字|車牌/, reply: '今天的幸運數字已經放在好友頁了，路上遇到 yoxi 車記得拍一下，看誰最接近！' },
   { match: /午|吃|散步|走/, reply: '午休可以走去國父紀念館，來回 15 分鐘，順便點亮一格新的街區。' },
   { match: /你是誰|名字|小精靈/, reply: '我是住在 yoxi 車燈裡的小精靈！你搭的每一趟、完成的每個任務，都會讓城市亮起來。' },
 ]
+
+/** 示範對話：照關鍵字回一句，{home} 換成目前玩家的家 */
+export function fallbackChatReply(message: string, personaId?: string | null) {
+  const hit = FALLBACK_CHAT.find((f) => f.match.test(message))
+  return (hit ? hit.reply : FALLBACK_CHAT_DEFAULT).replace('{home}', getDemoPersona(personaId).homePlace)
+}
 
 export const FALLBACK_CHAT_DEFAULT = '我在！今天有三個任務等你，完成一個就能點亮一格。想先做哪一個？'
 
@@ -228,8 +270,8 @@ export const FALLBACK_SPRITE_LINES = [
 ]
 
 export const FALLBACK_OPS = {
-  title: '下午搭 yoxi 去松菸，乘車金限 14–16 點',
-  detail: '對近 30 天常在信義區活動的玩家推播，乘車金只能在低谷時段折抵。',
-  reason: '信義區平日 14–15 點需求指數不到尖峰 7 成，叫車到上車也比全天中位數短，代表附近空車多；把任務排在這個時段，乘客拿到優惠，司機也接到原本沒有的單。',
+  title: '下午搭 yoxi 去松菸，14–16 點錯峰點燈',
+  detail: '對近 30 天常在信義區活動的玩家推播；預約就算錯峰，路線亮兩階、累積錯峰之光。',
+  reason: '信義區平日 14–15 點需求指數不到尖峰 7 成，叫車到上車也比全天中位數短，代表附近空車多；把任務排在這個時段，乘客不用久等，司機也接到原本沒有的單，不必發乘車金。',
   expectedRides: 40,
 }

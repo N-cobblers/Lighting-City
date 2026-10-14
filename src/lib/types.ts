@@ -1,4 +1,5 @@
-export type TaskKind = 'walk' | 'ride' | 'group'
+/** walk：步行到附近地點；scan：路上拍一台 yoxi 車；ride：搭 yoxi（預約或低谷時段，搭了亮兩階）。 */
+export type TaskKind = 'walk' | 'scan' | 'ride'
 
 export type Task = {
   id: string
@@ -11,6 +12,8 @@ export type Task = {
   rewardCredit: number
   reason: string
   done?: boolean
+  /** 小精靈排好的「晚點走」「準時預約」卡：換時段重新生成任務時保留，直到搭完 */
+  pinned?: boolean
 }
 
 export type Source = 'live' | 'demo'

@@ -63,12 +63,16 @@ export async function isFleetPlate(plate: string, hashes: Set<string>) {
   return hashes.has(await plateHash(plate))
 }
 
+/**
+ * 小精靈的五種光色，全部是車燈的暖光（不用綠、藍、粉）。依車牌數字加總 % 5 分配；
+ * 暖黃放在索引 1：示範車牌 TDX-3963 加總 21，拍到的會是暖黃，和影片裡主持的小精靈同色。
+ */
 export const SPRITE_PALETTES = [
-  { name: '暖黃', body: '#FFD35C', glow: '#FFC94A', rim: '#F2A93B' },
-  { name: '薄荷', body: '#8FF0C8', glow: '#58E0B0', rim: '#2FB88C' },
-  { name: '櫻粉', body: '#FFB3C7', glow: '#FF8FB0', rim: '#E86A92' },
-  { name: '天藍', body: '#9ED8FF', glow: '#6CC2FF', rim: '#3A9BE0' },
-  { name: '橘光', body: '#FFB46B', glow: '#FF9A3D', rim: '#E07A1F' },
+  { name: '琥珀', body: '#FFAE3D', glow: '#FF9B22', rim: '#D97812' },
+  { name: '暖黃', body: '#FFD452', glow: '#FFC83D', rim: '#EFA52E' },
+  { name: '蜜桃', body: '#FFD39E', glow: '#FFC07E', rim: '#EA9A56' },
+  { name: '暖白', body: '#FFF3D6', glow: '#FFE6B3', rim: '#DDBA80' },
+  { name: '玫瑰金', body: '#CC9468', glow: '#B9804F', rim: '#80502E' },
 ]
 
 export function paletteFor(sum: number) {

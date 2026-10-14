@@ -59,6 +59,12 @@ npm install
 npm run dev                 # 開發（http://localhost:5173）
 npm run build               # tsc 型別檢查 + vite 建置到 dist/
 npm run preview -- --port 4173
+npm test                    # App 的單元測試（vitest：錯峰規則、意圖判斷、小精靈工具、預測資料）
+
+# 錯峰點燈後端（需要 Node 24.12 以上、Java 21 以上）
+cd functions && npm ci
+npm test                    # Cloud Functions 單元測試
+npm run test:emulator       # 啟動 auth、firestore、functions 模擬器，跑安全規則與 recordTrip 測試
 
 # 測試（Python 3.11+）
 pip install -r scripts/requirements.txt && python -m playwright install chromium
@@ -66,6 +72,10 @@ python scripts/make_fixtures.py      # 示範車牌 PNG/PDF、假相機影片（
 python scripts/e2e.py                 # 需先 build + preview；截圖在 scripts/output/
 python scripts/ocr_check.py           # 用 onnxruntime 檢查車牌辨識模型
 python scripts/export_glb.py          # 需先 npm run dev；重新匯出 AR 用的小精靈 GLB
+python scripts/video/sprite/render_sprite.py preview|actions   # 小精靈設計預覽圖；影片用的動畫 PNG 序列（pop、hello、fly、point、cheer、bye、idle）
+
+# 3 分鐘影片：自動錄 App（強制 2.5 倍）、地圖場景、配音（edge-tts 兩種聲音）、網頁舞台逐格合成 1440p，步驟見 scripts/video/README.md
+python scripts/video/timeline.py && python scripts/video/render.py scripts/video/out/tl.json scripts/video/out/video.mp4 && python scripts/video/mix.py
 
 # 部署（需先建立 .firebaserc）
 npx firebase-tools deploy --only hosting,firestore:rules
@@ -77,29 +87,42 @@ npx firebase-tools deploy --only hosting,firestore:rules
 
 ```
 src/
-  App.tsx               外框：頂欄（時間＝一天劇本、AI 狀態燈、設定）、5 個分頁、toast
-  lib/store.tsx         全域狀態（React context）：設定、模擬時間、天氣、點亮格子、任務、圖鑑、分頁
+  App.tsx               外框：頂欄（品牌第二行的示範人物切換、時間＝一天劇本、AI 狀態燈、營運入口、設定）、4 個分頁（城市、拍車、好友、小精靈）、營運全螢幕頁、toast
+  lib/store.tsx         全域狀態（React context）：設定、模擬時間、天氣、點亮格子、任務、圖鑑、分頁；三位示範人物的足跡、圖鑑、錯峰點燈與還沒搭的回家卡分開存，切換後切回來還在；「點亮 X%」以各人的生活圈為分母
   lib/settings.ts       設定型別與 localStorage 讀寫（Firebase 設定、App Check、模型、房間、幸運數字覆寫…）
   lib/firebase.ts       Firebase 初始化（設定字串或 Hosting 的 /__/firebase/init.json）、App Check、匿名登入
-  lib/ai.ts             Gemini：今日任務（結構化 JSON）、小精靈對話（串流）、拍車台詞、營運派任務；全部有示範資料備援
-  lib/geo.ts            H3（第 9 級）、遊戲範圍、POI（yoxi 上車點座標來自競賽資料）、示範路線與取樣
+  lib/ai.ts             Gemini：今日任務（結構化 JSON，當天同時段同天氣快取）、小精靈對話（function calling 用 tools.ts 的工具）、拍車台詞、營運派任務；全部有示範資料備援，並記錄回應時間
+  lib/geo.ts            H3（個人地圖第 10 級）、雙北遊戲範圍、POI（yoxi 上車點座標來自競賽資料；板橋、淡水與三人的家是公開地標概略座標）、示範路線與取樣；板橋、淡水等長途與 road-<poiId> 路線是 OSRM 抓一次存成的靜態沿路路線（分鐘數＝OSRM 不塞車時間 × 1.5 ＋ 3 分鐘上車）
   lib/ocr.ts            PP-OCRv4 辨識模型 + ONNX Runtime Web，只做單行辨識（取景框已框住車牌）
-  lib/lucky.ts          今日幸運數字、車牌解析、雜湊比對示範車隊、小精靈配色
-  lib/sprite3d.ts       three.js 車燈小精靈（相機畫面上跳出動畫）與 GLB 匯出
+  lib/lucky.ts          今日幸運數字、車牌解析、雜湊比對示範車隊、小精靈光色（琥珀、暖黃、蜜桃、暖白、玫瑰金，依車牌加總 % 5；暖黃在索引 1，示範車牌 TDX-3963 拍到暖黃）
+  lib/sprite3d.ts       車燈小精靈的舞台：共用的打光與渲染設定、相機畫面上的跳出動畫、GLB 匯出（影片錄製也用同一套）
+  lib/spriteModel.ts    小精靈模型（車燈光球：發光核心與邊緣光、頭頂車燈 LED 光環、大眼睛有反光點與眼皮、可換嘴型、短手）與姿勢參數
+  lib/spriteActions.ts  小精靈動作時間軸（pop、hello、fly、point、cheer、bye、idle），spriteFx.ts 是閃光、光尾、光點特效
   lib/social.ts         Firestore 好友排行 rooms/{room}-{日期}/players/{uid}
-  lib/weather.ts        氣象署 F-C0032-001 與「傍晚下雨」情境
-  views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap 暗色，失敗改離線底圖）、搭車點亮動畫、任務卡
+  lib/weather.ts        氣象署 F-C0032-001，與「傍晚下雨」「晴天」兩個示範情境（錄錯峰點燈用晴天：下雨時 19 點也難叫，晚點走的差距出不來；小涵的示範任務跟著天氣換）
+  lib/forecast.ts       叫車預報：讀 data/wait_forecast.json（LightGBM 逐時等車中位數、八成區間、等超過 10 分鐘機率；晴天／下雨兩種情境）
+  lib/tools.ts          小精靈的工具：查預報、查進度、排錯峰（只提案，玩家按確認才加任務卡；回家卡照目前人物的家）
+  lib/homeTask.ts       「晚點走」「準時預約」回家卡（從市府出發，回家／回板橋／回淡水），小精靈、工具、示範任務共用
+  lib/intent.ts         Gemini 連不上時用關鍵字判斷意圖（時段、地點），呼叫同一組工具
+  lib/phase.ts          一天四個時段（早晨、白天、黃昏、夜晚）：各時段的地圖底圖、點亮格子與軌跡顏色
+  lib/offpeak.ts        錯峰點燈：是否算錯峰、錯峰之光換和泰 Points（每 20 格 1 點、每趟最多 2 點、每月上限 20 點、同一格一天一次）、3 天內閃爍的格子
+  views/MapView.tsx     點燈地圖（MapLibre + OpenFreeMap，依時段換底圖，失敗改離線底圖）、亮度圖例、搭車點亮動畫、任務卡輪播（不搭車的在前）、錯峰點燈（亮兩階、閃爍的錯峰之光、換到 Points 時小精靈跳出來）
   views/ScanView.tsx    相機取景、辨識、小精靈、AR 召喚（model-viewer）
-  views/SpriteChat.tsx  小精靈對話
-  views/FriendsView.tsx 幸運數字、好友排行、揪團、圖鑑
-  views/OpsView.tsx     營運：需求熱度地圖、低谷時段、下一週預測、AI 派任務
+  views/SpriteChat.tsx  小精靈對話；第一句是叫車預報，附「準時預約／晚點走／現在走」與城市層級的錯峰人數（示範）
+  views/SpriteAvatar.tsx 2D 小精靈頭像（和 3D 版同一個角色）；玩家自己的小精靈依時段換表情與配色（早晨睡眼、黃昏琥珀加圍巾、夜晚星星眼）
+  views/FriendsView.tsx 幸運數字、好友排行、圖鑑
+  views/OpsView.tsx     營運（頂欄「營運」進入的全螢幕頁，不放在乘客分頁）：需求熱度地圖、低谷時段、錯峰點燈卡（等車差距、每趟 Points 成本對比派遣費）、模型與系統卡（回測、特徵重要性、Gemini 回應時間與成本）、下一週預測、AI 派任務
   data/demand.json      由 data-pipeline 匯出的彙總指數（0–100），不含個別行程
-  data/demo.ts          虛構示範玩家「小涵」、各時段示範任務與對話
+  data/wait_forecast.json、wait_model_card.json  data-pipeline/scripts/14_wait_model.py 匯出的等車預測與回測結果（彙總）
+  data/demo.ts          虛構示範人物：小涵（主角，信義區上班族）、阿哲（板橋通勤族）、小雅（淡水週末旅遊者）；各人的足跡路線、生活圈、各時段示範任務與對話
   data/districts.json   台北市與部分新北市行政區界（離線底圖）
 public/models/          PP-OCRv4 辨識模型（10.8 MB）與字典
-public/sprites/         5 種配色的小精靈 GLB（AR 用，scripts/export_glb.py 產生）
-data-pipeline/          yoxi 資料前處理、分析、預測、匯出（Python）與 BigQuery ML SQL
+public/sprites/         5 種光色的小精靈 GLB（AR 用，scripts/export_glb.py 產生，順序同 lucky.ts）
+functions/              錯峰點燈後端：recordTrip（錯峰判斷、Points 帳本用行程編號防重複、每趟最多 2 點、每月上限、城市人數未滿 20 不公開）與模擬器測試
+.github/workflows/ci.yml  每個 PR 自動跑：App 建置與單元測試、Cloud Functions 模擬器測試、e2e
+data-pipeline/          yoxi 資料前處理、分析、預測（含 14 號 LightGBM 等車模型）、匯出（Python）與 BigQuery ML SQL
 docs/                   提案決策、研究報告、資料分析報告（data-analysis-report.md）、影片腳本、簡報原始檔、示範車牌
+scripts/video/          3 分鐘方案說明影片的自動錄製與合成（台詞 script.py、分鏡 timeline.py、網頁舞台 stage.html；輸出在 scripts/video/out/，不進 git）。錄 App 畫面要用 --force-device-scale-factor，只靠 Playwright 的 device_scale_factor 模擬的話，CDP 錄下來只有 1 倍
 ```
 
 ## 不要改掉的決策（有原因）
@@ -112,17 +135,19 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 - **ONNX Runtime 用單執行緒 wasm**（`vite.config.ts` 把 `onnxruntime-web` 指到 `onnxruntime-web/wasm`）：多執行緒需要 COOP/COEP，會擋掉 Google Fonts 與圖磚。
 - **AR 用系統 AR**（model-viewer → iPhone Quick Look、Android Scene Viewer／WebXR），相機畫面上的跳出動畫是 three.js 疊圖。
 - **示範玩家的歷史路線走敦化北路**，示範搭車走光復南北路，這樣錄影時搭車才會點亮新的格子。改路線時要確認 `scripts/e2e.py` 的「點亮比例有增加」檢查仍通過。
-- **點燈地圖以單人私有足跡為核心**：足跡只保存在使用者裝置，不分享精確路線；雙北是服務構想範圍，原型先聚焦信義／松山。
+- **點燈地圖以單人私有足跡為核心**：足跡只保存在使用者裝置，不分享精確路線。地圖範圍是雙北（三人 demo 需要板橋、淡水），「點亮 X%」以每個人的生活圈為分母，用整個雙北當分母幾乎都是 0%。
 - **重訪與淡化**：首次經過留下可保留的低亮足跡；30 天內重訪會逐步提高亮度（最多 3 階），每 7 天未重訪柔和降低一階，最低保留一階，不抹除曾到訪的記錄。
-- **使用者 demo 資料**：以虛構玩家「小涵」作主故事；可用其他虛構情境作簡短對照，但不可把競賽資料中的真實乘客行程包裝成個人路線。
+- **使用者 demo 資料**：以虛構玩家「小涵」作主故事；阿哲（板橋通勤族）、小雅（淡水週末旅遊者）是虛構的簡短對照，用來說明每個人亮起來的地方不一樣。三人都在市府附近上班，傍晚回家都從市府出發、沿用市府的等車預測。不可把競賽資料中的真實乘客行程包裝成個人路線。示範任務不能出現乘車金或優惠券（`rewardCredit` 一律 0），也不放揪團任務。
 - **地圖底圖 OpenFreeMap 需要標示出處**，影片裡也要保留。
+
+- **錯峰點燈（功能亮點）**：不發優惠券，用光讓人錯峰。預約（任務卡、準時預約）一律算錯峰；現在出發只有平日在尖峰前後一小時（17、19 點）才算，週末只算預約。錯峰的路線亮兩階，經過的格子累積成「錯峰之光」，每 20 格換 1 點和泰 Points，每趟最多 2 點（一趟最多 40 格計入；長途超過的格子照樣發光，但不累計，也不留到下一趟），每人每月上限 20 點，同一格一天只算一次。個人 Points 只在換到的那一刻由小精靈說，畫面上其他地方只放城市層級的數字（示範）。Points 由和泰集團 Points 行銷預算支應；正式版用 yoxi 自己的行程紀錄判斷是否錯峰，點燈足跡仍只存在手機。小精靈排好的卡（`pinned`）換時段重新生成任務時保留，才能「早上決定、傍晚收成」。
 
 ## 資料與隱私（嚴格遵守）
 
 - yoxi 競賽資料（約 96.5 萬筆行程，2026/2/1–4/30）含乘客編號與精確座標，**不得**放進 `src/`、`public/`、`dist/` 或任何會公開的地方，也不要 commit 原始或清理後的逐筆資料。
-- App 只能放彙總後的 0–100 指數（`src/data/demand.json`）。
+- App 只能放彙總後的資料：0–100 指數（`src/data/demand.json`）與模型預測（`src/data/wait_forecast.json`，每個地點×星期×小時的分鐘數與機率）。模型在 data-pipeline 本機訓練，競賽資料不上雲。
 - 原始 7z 放 `data-pipeline/data/raw/`，解壓到 `data-pipeline/data/extracted/`；逐筆中間檔（`raw_df.pkl`、`*.parquet`）都已列在 `.gitignore`。`data-pipeline/data/processed/` 裡的 JSON／CSV 是彙總結果，可以保留。
-- 人物「小涵」、示範車牌（TDX-3963、TDX-5528、TDX-1832、TDX-7708；ABC-1234 為非車隊）都是虛構的，畫面要保留「黑客松原型」標籤。
+- 人物「小涵」「阿哲」「小雅」、示範車牌（TDX-3963、TDX-5528、TDX-1832、TDX-7708；ABC-1234 為非車隊）都是虛構的，畫面要保留「黑客松原型」標籤。三人的長途路線是用公開 OSRM 以公開地標座標抓的，不是競賽資料。
 
 ## 資料分析重點（簡報可引用，來源：data-pipeline/data/processed/metrics.json）
 
@@ -131,21 +156,24 @@ docs/                   提案決策、研究報告、資料分析報告（data-
 - 搭 5 次以上的乘客（34%）貢獻 83% 行程；其上下車點中位數 58% 集中在 2 個 H3 格、48% 行程在同一個 3 小時。
 - 叫車到上車中位數 5.9 分鐘，平日尖峰拉長到 6.5–7.2 分鐘；信義區平日低谷 11–12、14–15、20 點，松山區 11–16、20 點。
 - 隔日逐時預測 WAPE：雙北 6.7%（基準 7.7%）、信義 16.4%（19.8%）、松山 15.5%（19.7%）。
+- 等車預測（LightGBM，`data-pipeline/scripts/14_wait_model.py`）4 週滾動回測：逐時等車中位數誤差行政區 0.60 分（現行作法「近 4 週同星期同時段中位數」0.66 分，少 8.1%）、平日尖峰 0.74 分（0.79，少 6.1%）、熱門上車格 1.41 分（1.67，少 15.9%）；八成區間實際涵蓋 78%；影響最大的特徵是所在行政區的等車水準、時段、近 4 週同時段等車。
 - 雙北路線（起訖歸到 H3 第 9 級、本機 OSRM 推估最快路線，`data-pipeline/data/processed/routes/`）：前 10% 路段承載 76% 行駛量；主走廊為忠孝東西路、建國高架、中山高、基隆路；平日低谷時通勤幹道流量剩尖峰約 7 成，忠孝東路一到四段持平；同一段路 10 點出發比 17 點少花約 22% 時間；看不出系統性繞路（繞路比中位數 0.98）。
 
 ## 程式注意事項
 
 - Firebase JS SDK v13 的 `Part` 要寫 `{ type: 'text', text }`。
 - `lib/ai.ts` 用 `Schema.object(...)` 做結構化輸出，回傳後一律再做欄位驗證與截斷。
-- 地圖的 bottom sheet 會蓋住下半部，`fitBounds`／`flyTo` 要帶 padding；搭車時先收起 sheet，`maxZoom` 13.9。
+- 換時段換底圖用 `setStyle(url, { diff: false })`，點亮格子等圖層在 `style.load` 重新疊上；早晨與白天同一張底圖，只換格子顏色。
+- 地圖的 bottom sheet 會蓋住下半部，`fitBounds` 要帶 padding；`flyTo` 不要帶 padding（會留在地圖上，之後的 `fitBounds` 會被多扣一次而拉得很遠），改用 `offset`。搭車時先收起 sheet，`maxZoom` 13.9。
 - 拍車流程要先 `cropForOcr` 再停相機，否則會讀到黑畫面。
+- 換時段換底圖的保險只看新底圖的 `style.load` 有沒有來，不要用 `isStyleLoaded()`：搭車動畫每一格都在更新軌跡，那段時間它一直是 false，會誤判成底圖失敗。軌跡存在 ref 裡，換底圖重疊圖層時接著畫。
 - e2e 的假相機影片必須是直式（手機相機是直式；橫式影片在直式容器裡會被裁掉車牌）。
-- 視覺：深藍夜色 `#0E1830`、車燈暖黃 `#FFC94A`、奶油白 `#F5F0E6`、字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo。
+- 視覺：一天分四個時段換色，劇本的 08:30、12:30、15:00、18:05 各落一段：早晨 5–10 點淺藍天空 `#DCEBFF`、白天 10–15 點明亮 `#F4F7FB`、黃昏 15–18 點紫色晚霞（`#6B4A7A`→`#2B2140`）、夜晚 18–5 點深藍夜色 `#0E1830`。車燈暖黃 `#FFC94A` 是按鈕與重點色，全天不變；早晨、白天的點亮格子改用琥珀橘系（淡黃在淺色底圖上看不見），黃昏、夜晚是暖黃光暈，越常去越接近白熱。配色變數在 `styles.css` 的 `:root[data-phase]`（App 依劇本時間設定 `<html data-phase>`，換時段時有 1 秒淡入淡出），底圖（OpenFreeMap positron／fiord／dark）與格子顏色在 `lib/phase.ts`。營運頁固定用夜晚配色。每個時段的文字對比都要至少 4.5:1（大字 3:1），改顏色後要重新檢查。字型 Noto Sans TC + Fredoka。小精靈是原創角色，不要畫任何既有角色或 yoxi 官方 logo，也不要做成有臉的汽車或檯燈。小精靈光色只用車燈暖光（不用綠、藍、粉）；3D 用 Neutral 色調映射、曝光 0.72，太亮時橘色會被映射成粉色，身體也不要加 clearcoat、sheen（邊緣會變暗）。
 
 ## 下一步（建議順序）
 
 1. 部署到 https，在 iPhone 與 Android 實測：Gemini 任務卡（綠色標籤）、好友排行兩機同步、拍車、AR 召喚。把錯誤訊息修掉。
-2. 錄製 3 分鐘影片的實機片段（步驟見 `docs/video-script.md` 最後一節）。
+2. 3 分鐘影片已由 `scripts/video/` 自動產生（腳本見 `docs/video-script.md`）；決賽前可補實機的拍車 AR 片段。
 3. 更新簡報：P9 架構（原型實際技術）、車資與 SOM、痛點頁補上資料發現。
 4. 決賽前：BigQuery ML ARIMA_PLUS 實跑（`data-pipeline/data/processed/bigquery/sql/`）並把結果接進營運頁；司機端畫面；任務完成的位置驗證（目前「我到了」是直接完成）。
 

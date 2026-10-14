@@ -19,6 +19,25 @@ export function rainScenario(now: Date): Weather {
   }
 }
 
+/** 不下雨的情境：傍晚的叫車預報用晴天的等車預測，錄錯峰點燈（晚一小時好叫很多）時用。 */
+export function clearScenario(now: Date): Weather {
+  const d = (h: number) => {
+    const x = new Date(now)
+    x.setHours(h, 0, 0, 0)
+    return x.toISOString()
+  }
+  return {
+    source: 'scenario',
+    desc: '晴時多雲',
+    blocks: [
+      { start: d(6), end: d(18), pop: 10, desc: '晴時多雲' },
+      { start: d(18), end: d(23), pop: 10, desc: '多雲' },
+    ],
+    eveningPop: 10,
+    note: '示範情境',
+  }
+}
+
 const pick = (obj: any, ...keys: string[]) => {
   if (!obj) return undefined
   for (const k of keys) {
