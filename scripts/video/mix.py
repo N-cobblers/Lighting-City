@@ -17,6 +17,7 @@ SFXDIR.mkdir(parents=True, exist_ok=True)
 SFX = {
     'flash': ("0.22*sin(2*PI*(260*t+700*t*t))*exp(-2.2*t)+0.12*sin(2*PI*(520*t+1400*t*t))*exp(-2.6*t)", 1.0, '', 0.8),
     'pop': ("0.55*sin(2*PI*(420*t+2400*t*t))*exp(-16*t)", 0.28, '', 0.7),
+    'boing': ("0.45*sin(2*PI*(180*t+520*t*t))*exp(-4.5*t)*(1+0.45*sin(2*PI*13*t))", 0.65, 'lowpass=f=3000', 0.55),
     'impact': ("0.95*sin(2*PI*52*t)*exp(-3.6*t)+0.5*sin(2*PI*104*t)*exp(-6*t)+0.3*(random(1)*2-1)*exp(-22*t)", 1.4, 'lowpass=f=2400', 0.95),
     'whoosh': ("(random(2)*2-1)*0.5*sin(PI*t/0.5)*sin(PI*t/0.5)", 0.5, 'highpass=f=700,lowpass=f=6000', 0.45),
     'zoom': ("(random(3)*2-1)*0.4*sin(PI*t/0.6)*sin(PI*t/0.6)+0.08*sin(2*PI*(300*t+500*t*t))*sin(PI*t/0.6)", 0.6, 'highpass=f=400,lowpass=f=5000', 0.4),

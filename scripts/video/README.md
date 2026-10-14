@@ -6,7 +6,8 @@
 
 ## 做法
 
-- 主角是虛構的小涵，車燈小精靈當主持，有自己的聲音。
+- 主角是虛構的小涵；小精靈用第一人稱帶大家走一天，男聲只講痛點、數據、AI 與商業。
+- 一次只有一個主角：小精靈（依配音音量逐格換嘴型）、App 特寫（只放字幕）、全畫面大字或數字（不放字幕）、地圖場景。背景統一深藍。
 - 畫面由 `stage.html` 這個網頁舞台逐格畫出來，再送進 ffmpeg 編碼，包括：
   - 手機位置與推近、三機並排、左右分割對比
   - 數字跳動、文字跟著旁白逐行出現
@@ -30,8 +31,9 @@
 # 1. 建置並啟動 App（另開一個視窗）
 npm run build && npm run preview -- --port 4173
 
-# 2. 小精靈動作序列（720×720 透明背景）
+# 2. 小精靈動作序列（720×720 透明背景）：飛行等動作，以及講話對嘴、卡通動作（第三版）
 python scripts/video/sprite/render_sprite.py actions
+python scripts/video/sprite/render_sprite.py actions3
 
 # 3. 錄 App：小涵的一天、小精靈用工具
 python scripts/video/record_story.py

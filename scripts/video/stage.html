@@ -16,6 +16,12 @@
   .bg.dusk { background: radial-gradient(900px 600px at 80% 20%, rgba(255,170,120,.45) 0%, rgba(255,170,120,0) 60%), linear-gradient(160deg, #855A8F 0%, #533A6C 48%, #2B2140 100%); }
   .bg.night { background: radial-gradient(1000px 640px at 25% 15%, rgba(255,201,74,.10) 0%, rgba(255,201,74,0) 60%), linear-gradient(160deg, #182C5A 0%, #0E1830 55%, #0A1226 100%); }
   .bg.ink { background: #070d1c; }
+  .bg.navy { background: radial-gradient(1400px 900px at 50% 40%, #182D5C 0%, #0F1D3D 55%, #0A1430 100%); }
+  .t-head { font-size: 74px; font-weight: 900; line-height: 1.3; letter-spacing: .02em; color: #FFFFFF; text-align: center; text-shadow: 0 4px 24px rgba(0,0,0,.35); }
+  .t-num { font-family: 'Fredoka', 'Noto Sans TC', sans-serif; font-weight: 700; font-size: 240px; line-height: 1; color: #FFC94A; text-align: center; text-shadow: 0 0 50px rgba(255,201,74,.35); }
+  .t-num.sm { font-size: 168px; }
+  .t-cap { font-size: 44px; font-weight: 700; line-height: 1.4; color: #F6F1E3; text-align: center; }
+  .t-src { font-size: 24px; font-weight: 500; color: rgba(246,241,227,.6); text-align: center; }
   .dots { position: absolute; inset: -40px; opacity: .55; pointer-events: none;
     background-image: radial-gradient(circle, rgba(255,201,74,.35) 1.4px, transparent 1.6px); background-size: 46px 46px; }
   .bg.dawn + .dots, .bg.day + .dots { background-image: radial-gradient(circle, rgba(232,154,30,.22) 1.4px, transparent 1.6px); }
@@ -227,7 +233,7 @@ function renderShot(sh, t, alpha, enter) {
     if (tx.pop) { s = a < 0 ? .6 : lerp(.6, 1, backOut(a / 0.5)); dy = 0; }
     if (out > 0) { op *= 1 - clamp(out / 0.3); dy -= easeOut(out / 0.3) * 20; }
     tx.el.style.opacity = op.toFixed(3);
-    tx.el.style.transform = `translate(${tx.x}px, ${tx.y + dy}px) translate(${tx.anchor === 'center' ? '-50%' : tx.anchor === 'right' ? '-100%' : '0'}, 0) scale(${s})`;
+    tx.el.style.transform = `translate(${tx.x}px, ${tx.y + dy}px) translate(${tx.anchor === 'center' ? '-50%' : tx.anchor === 'right' ? '-100%' : '0'}, ${tx.vcenter ? '-50%' : '0'}) scale(${s})`;
     if (tx.count && a > 0) {
       const [from, to, dec, suffix, prefix] = tx.count;
       const v = lerp(from, to, easeOut(a / (tx.countDur || 1.0)));
@@ -241,12 +247,19 @@ function renderShot(sh, t, alpha, enter) {
   }
   for (const sp of sh._sprites) {
     const a = lt - sp.t;
-    const seq = TL.sprite[sp.action];
-    if (!seq || a < 0 || (sp.out != null && lt > sp.out + 0.3)) { sp.el.style.opacity = 0; continue; }
-    let i = Math.floor(a * FPS);
+    let name = sp.action;
+    if (sp.action === 'talk') {
+      const ti = Math.floor((lt - sp.envT0) * FPS);
+      const env = sp.env || [];
+      const v = ti >= 0 && ti < env.length ? Math.max(env[ti], (env[ti - 1] || 0) * 0.7) : 0;
+      name = `talk_${sp.expr}_${v < 0.12 ? 0 : v < 0.45 ? 1 : 2}`;
+    }
+    const seq = TL.sprite[name];
+    if (!seq || a < 0 || (sp.out != null && lt > sp.out + 0.3) || (sp.until != null && lt >= sp.until)) { sp.el.style.opacity = 0; continue; }
+    let i = Math.floor(a * FPS) + (sp.skip || 0);
     i = sp.loop ? i % seq.n : Math.min(i, seq.n - 1);
     setImg(sp.el, seq.dir + String(i + 1).padStart(4, '0') + '.png');
-    const pos = kfAt(sp.path, lt) || [sp.x, sp.y, sp.scale || 1];
+    const pos = kfAt(sp.path, lt, sp.bounce ? backOut : easeIO) || [sp.x, sp.y, sp.scale || 1];
     const fo = sp.out != null ? 1 - clamp((lt - sp.out) / 0.3) : 1;
     sp.el.style.opacity = fo;
     sp.el.style.transform = `translate(${pos[0] - 180}px, ${pos[1] - 180}px) scale(${(pos[2] || 1) * (sp.flip ? -1 : 1)}, ${pos[2] || 1})`;
